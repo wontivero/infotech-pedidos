@@ -1,6 +1,6 @@
 // 1. Importaciones del SDK de Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-storage.js";
 
 // 2. Configuración de Firebase (reemplazar con tus credenciales)
@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarClientes();
   cargarClientesEnMemoria();
   cargarLibrosEnMemoria();
+  cargarPedidos(); // Cargar pedidos al inicio
 
   // Configuración del modal de imágenes
   const modalImagenElement = document.getElementById('modalImagen');
@@ -733,4 +734,660 @@ document.getElementById('btn-guardar-edicion-cliente').addEventListener('click',
   cargarClientes();
   cargarClientesEnMemoria();
   bootstrap.Modal.getInstance(document.getElementById('modalEditarCliente')).hide();
+});
+
+// --- LÓGICA PARA PESTAÑA "LISTA DE PEDIDOS" ---
+
+const tablaPedidosContainer = document.getElementById('tabla-pedidos-container');
+const btnRefrescarPedidos = document.getElementById('btn-refrescar-pedidos');
+const filtroTexto = document.getElementById('filtro-pedidos-texto');
+const filtroEstado = document.getElementById('filtro-pedidos-estado');
+const selectAccionMasiva = document.getElementById('accion-masiva-estado');
+const btnAplicarMasivo = document.getElementById('btn-aplicar-masivo');
+let pedidosEnMemoria = []; // Para acceder rápido al detalle
+
+const cargarPedidos = async () => {
+  tablaPedidosContainer.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></div>';
+
+  try {
+    // Traer pedidos ordenados por fecha (más nuevos primero)
+    // Nota: Si falla por falta de índice en Firebase, verás un link en la consola para crearlo.
+    // Si no querés crear índice ahora, sacá el orderBy y ordenalos con JS.
+    const q = query(collection(db, "pedidos"), orderBy("fecha_creacion", "desc"));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      tablaPedidosContainer.innerHTML = '<div class="alert alert-info">No hay pedidos registrados.</div>';
+      return;
+    }
+
+    pedidosEnMemoria = [];
+    querySnapshot.forEach((doc) => {
+      pedidosEnMemoria.push({ id: doc.id, ...doc.data() });
+    });
+
+    filtrarYRenderizarPedidos();
+
+  } catch (error) {
+    console.error("Error al cargar pedidos:", error);
+    tablaPedidosContainer.innerHTML = `<div class="alert alert-danger">Error al cargar pedidos (Revisar consola por índices).<br>${error.message}</div>`;
+  }
+};
+
+const filtrarYRenderizarPedidos = () => {
+  const texto = filtroTexto.value.toLowerCase();
+  const estado = filtroEstado.value;
+
+  // Filtrar en memoria
+  const pedidosFiltrados = pedidosEnMemoria.filter(pedido => {
+    const cliente = clientesEnMemoria.find(c => c.id === pedido.id_cliente);
+    const nombreCliente = cliente ? cliente.nombre.toLowerCase() : '';
+    const codigo = pedido.codigo_seguimiento ? pedido.codigo_seguimiento.toString().toLowerCase() : '';
+    
+    const coincideTexto = nombreCliente.includes(texto) || codigo.includes(texto);
+    const coincideEstado = estado === "" || pedido.estado_general === estado;
+
+    return coincideTexto && coincideEstado;
+  });
+
+  if (pedidosFiltrados.length === 0) {
+    tablaPedidosContainer.innerHTML = '<div class="alert alert-warning">No se encontraron pedidos con esos filtros.</div>';
+    return;
+  }
+
+  let html = `
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="check-todos-pedidos"></th>
+            <th>Fecha</th>
+            <th>Código</th>
+            <th>Cliente</th>
+            <th>Estado</th>
+            <th>Progreso</th>
+            <th>Saldo</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+  const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+
+  pedidosFiltrados.forEach((pedido) => {
+      const fecha = pedido.fecha_creacion ? new Date(pedido.fecha_creacion.seconds * 1000).toLocaleDateString() : '-';
+      
+      // Color del badge según estado
+      let badgeClass = 'bg-secondary';
+      if (pedido.estado_general === 'En cola de impresión') badgeClass = 'bg-warning text-dark';
+      if (pedido.estado_general === 'Imprimiendo / Armando') badgeClass = 'bg-info text-dark';
+      if (pedido.estado_general === 'Encuadernando') badgeClass = 'bg-primary';
+      if (pedido.estado_general === 'Listo para retirar') badgeClass = 'bg-success';
+      
+      // Calcular progreso de libros terminados
+      const totalItems = pedido.items.length;
+      const itemsTerminados = pedido.items.filter(i => i.estado === 'Terminado').length;
+      const esCompleto = totalItems > 0 && totalItems === itemsTerminados;
+      
+      // Si está completo y no entregado, resaltamos la fila
+      const rowClass = (esCompleto && pedido.estado_general !== 'Entregado') ? 'table-success' : '';
+      const progresoHtml = esCompleto 
+        ? `<span class="badge bg-success"><i class="bi bi-check-all"></i> ${itemsTerminados}/${totalItems}</span>` 
+        : `<span class="badge bg-secondary">${itemsTerminados}/${totalItems}</span>`;
+
+      html += `
+        <tr class="${rowClass}">
+          <td><input type="checkbox" class="form-check-input check-pedido" value="${pedido.id}"></td>
+          <td><small>${fecha}</small></td>
+          <td class="fw-bold text-primary">${pedido.codigo_seguimiento}</td>
+          <td>${pedido.id_cliente ? (clientesEnMemoria.find(c => c.id === pedido.id_cliente)?.nombre || 'Cliente eliminado') : 'Desconocido'}</td>
+          <td><span class="badge ${badgeClass}">${pedido.estado_general}</span></td>
+          <td>${progresoHtml}</td>
+          <td>${formatter.format(pedido.saldo_pendiente)}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary btn-ver-detalle" data-id="${pedido.id}" title="Ver Detalle"><i class="bi bi-eye"></i></button>
+            <div class="btn-group">
+              <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                Estado
+              </button>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item btn-cambiar-estado" href="#" data-id="${pedido.id}" data-estado="En cola de impresión">En cola</a></li>
+                <li><a class="dropdown-item btn-cambiar-estado" href="#" data-id="${pedido.id}" data-estado="Imprimiendo / Armando">Imprimiendo</a></li>
+                <li><a class="dropdown-item btn-cambiar-estado" href="#" data-id="${pedido.id}" data-estado="Encuadernando">Encuadernando</a></li>
+                <li><a class="dropdown-item btn-cambiar-estado" href="#" data-id="${pedido.id}" data-estado="Listo para retirar">Listo para retirar</a></li>
+                <li><a class="dropdown-item btn-cambiar-estado" href="#" data-id="${pedido.id}" data-estado="Entregado">Entregado</a></li>
+              </ul>
+            </div>
+            ${esCompleto ? `<button class="btn btn-sm btn-success btn-whatsapp-listo" data-id="${pedido.id}" title="Avisar por WhatsApp"><i class="bi bi-whatsapp"></i></button>` : ''}
+          </td>
+        </tr>
+      `;
+    });
+
+  html += '</tbody></table>';
+  tablaPedidosContainer.innerHTML = html;
+  
+  // Resetear estado del botón masivo al renderizar
+  btnAplicarMasivo.disabled = true;
+};
+
+btnRefrescarPedidos.addEventListener('click', cargarPedidos);
+filtroTexto.addEventListener('input', filtrarYRenderizarPedidos);
+filtroEstado.addEventListener('change', filtrarYRenderizarPedidos);
+
+// Eventos delegados para la tabla de pedidos
+tablaPedidosContainer.addEventListener('click', async (e) => {
+  // Ver Detalle
+  const btnDetalle = e.target.closest('.btn-ver-detalle');
+  if (btnDetalle) {
+    const id = btnDetalle.dataset.id;
+    const pedido = pedidosEnMemoria.find(p => p.id === id);
+    if (!pedido) return;
+
+    document.getElementById('detalle-pedido-codigo').textContent = pedido.codigo_seguimiento;
+    
+    // Info Cliente
+    const cliente = clientesEnMemoria.find(c => c.id === pedido.id_cliente);
+    document.getElementById('detalle-pedido-info-cliente').innerHTML = `
+      <strong>Cliente:</strong> ${cliente ? cliente.nombre : 'Desconocido'}<br>
+      <strong>Teléfono:</strong> ${cliente ? cliente.telefono : '-'}<br>
+      <strong>Colegio:</strong> ${cliente ? cliente.colegio : '-'}
+    `;
+
+    // Lista de Items
+    const listaItems = document.getElementById('detalle-pedido-lista-items');
+    listaItems.innerHTML = '';
+    const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+    
+    pedido.items.forEach(item => {
+      listaItems.innerHTML += `
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <span class="fw-bold">${item.titulo}</span>
+            <br><small class="text-muted">${item.editorial || ''}</small>
+          </div>
+          <span>${formatter.format(item.precio)}</span>
+        </li>
+      `;
+    });
+
+    // Totales
+    document.getElementById('detalle-pedido-totales').innerHTML = `
+      Total: ${formatter.format(pedido.total)}<br>
+      Seña: ${formatter.format(pedido.sena_pagada)}<br>
+      <span class="text-danger">Saldo: ${formatter.format(pedido.saldo_pendiente)}</span>
+    `;
+
+    const modal = new bootstrap.Modal(document.getElementById('modalDetallePedido'));
+    modal.show();
+  }
+
+  // Cambiar Estado
+  const btnEstado = e.target.closest('.btn-cambiar-estado');
+  if (btnEstado) {
+    e.preventDefault();
+    const id = btnEstado.dataset.id;
+    const nuevoEstado = btnEstado.dataset.estado;
+
+    try {
+      await updateDoc(doc(db, "pedidos", id), { estado_general: nuevoEstado });
+      // Actualizar localmente sin recargar todo
+      cargarPedidos();
+    } catch (error) {
+      console.error("Error al actualizar estado:", error);
+      alert("No se pudo actualizar el estado.");
+    }
+  }
+
+  // Botón WhatsApp (Pedido Listo)
+  const btnWhatsapp = e.target.closest('.btn-whatsapp-listo');
+  if (btnWhatsapp) {
+    const id = btnWhatsapp.dataset.id;
+    const pedido = pedidosEnMemoria.find(p => p.id === id);
+    const cliente = clientesEnMemoria.find(c => c.id === pedido.id_cliente);
+    
+    if (!pedido || !cliente) return;
+
+    const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 });
+    const saldo = pedido.saldo_pendiente;
+    
+    let mensaje = `Hola ${cliente.nombre}! 👋\n`;
+    mensaje += `¡Buenas noticias! Tu pedido *#${pedido.codigo_seguimiento}* ya está completo y listo para retirar. 📚✨\n\n`;
+    
+    if (saldo > 0) {
+      mensaje += `❗ *Saldo pendiente:* ${formatter.format(saldo)}\n`;
+    } else {
+      mensaje += `✅ *El pedido está pagado.*\n`;
+    }
+    
+    mensaje += `\nTe esperamos!`;
+
+    navigator.clipboard.writeText(mensaje);
+    alert("✅ Mensaje copiado al portapapeles.\n\nYa podés pegarlo en WhatsApp.");
+  }
+});
+
+// --- LÓGICA DE ACCIONES MASIVAS Y CHECKBOXES ---
+
+tablaPedidosContainer.addEventListener('change', (e) => {
+  // Checkbox "Seleccionar Todos"
+  if (e.target.id === 'check-todos-pedidos') {
+    const checkboxes = tablaPedidosContainer.querySelectorAll('.check-pedido');
+    checkboxes.forEach(cb => cb.checked = e.target.checked);
+    actualizarBotonMasivo();
+  }
+
+  // Checkbox individual
+  if (e.target.classList.contains('check-pedido')) {
+    actualizarBotonMasivo();
+  }
+});
+
+const actualizarBotonMasivo = () => {
+  const checkboxes = tablaPedidosContainer.querySelectorAll('.check-pedido:checked');
+  btnAplicarMasivo.disabled = checkboxes.length === 0 || selectAccionMasiva.value === "";
+};
+
+selectAccionMasiva.addEventListener('change', actualizarBotonMasivo);
+
+btnAplicarMasivo.addEventListener('click', async () => {
+  const nuevoEstado = selectAccionMasiva.value;
+  const checkboxes = tablaPedidosContainer.querySelectorAll('.check-pedido:checked');
+  const ids = Array.from(checkboxes).map(cb => cb.value);
+
+  if (!nuevoEstado || ids.length === 0) return;
+
+  if (!confirm(`¿Estás seguro de cambiar el estado de ${ids.length} pedidos a "${nuevoEstado}"?`)) return;
+
+  btnAplicarMasivo.disabled = true;
+  btnAplicarMasivo.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+  try {
+    const promesas = ids.map(id => updateDoc(doc(db, "pedidos", id), { estado_general: nuevoEstado }));
+    await Promise.all(promesas);
+    alert("¡Estados actualizados correctamente!");
+    cargarPedidos(); // Recargar para ver cambios
+    selectAccionMasiva.value = ""; // Resetear select
+  } catch (error) {
+    console.error("Error en actualización masiva:", error);
+    alert("Hubo un error al actualizar algunos pedidos.");
+  } finally {
+    btnAplicarMasivo.innerHTML = 'Aplicar';
+  }
+});
+
+// --- LÓGICA PARA PESTAÑA "COLA DE PRODUCCIÓN" ---
+
+const tablaProduccionContainer = document.getElementById('tabla-produccion-container');
+const btnRefrescarProduccion = document.getElementById('btn-refrescar-produccion');
+const filtroProduccionLibro = document.getElementById('filtro-produccion-libro');
+let itemsProduccion = []; // Lista aplanada de libros pendientes
+let gruposProduccion = {}; // Objeto para agrupar por título
+
+const cargarColaProduccion = async (grupoAbiertoKey = null) => {
+  // Solo mostrar spinner de carga completa si NO estamos manteniendo un grupo abierto
+  if (!grupoAbiertoKey) {
+    tablaProduccionContainer.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-warning" role="status"></div></div>';
+  }
+
+  try {
+    // Traemos pedidos que NO estén entregados (para ver qué falta producir)
+    // Nota: Firebase no permite filtros de desigualdad (!=) simples sin índices complejos a veces,
+    // así que traemos todo y filtramos en memoria lo que no sea "Entregado".
+    const q = query(collection(db, "pedidos"), orderBy("fecha_creacion", "asc")); // Los más viejos primero (prioridad)
+    const querySnapshot = await getDocs(q);
+
+    itemsProduccion = [];
+    gruposProduccion = {};
+
+    querySnapshot.forEach((doc) => {
+      const pedido = doc.data();
+      // Ignorar pedidos ya entregados
+      if (pedido.estado_general === 'Entregado') return;
+
+      const cliente = clientesEnMemoria.find(c => c.id === pedido.id_cliente);
+      const nombreCliente = cliente ? cliente.nombre : 'Desconocido';
+      const fecha = pedido.fecha_creacion ? new Date(pedido.fecha_creacion.seconds * 1000).toLocaleDateString() : '-';
+
+      // "Aplanar" los items: Crear una fila por cada libro
+      pedido.items.forEach((item, index) => {
+        itemsProduccion.push({
+          pedidoId: doc.id,
+          pedidoCodigo: pedido.codigo_seguimiento,
+          cliente: nombreCliente,
+          fecha: fecha,
+          itemIndex: index, // Necesario para saber qué item actualizar en el array
+          titulo: item.titulo,
+          editorial: item.editorial || '',
+          estadoItem: item.estado || 'En cola de impresión' // Estado individual del libro
+        });
+      });
+    });
+
+    // Ordenar por título para agrupar tandas
+    itemsProduccion.sort((a, b) => a.titulo.localeCompare(b.titulo));
+
+    // Agrupar por Título + Editorial
+    itemsProduccion.forEach(item => {
+      const key = `${item.titulo} - ${item.editorial}`;
+      if (!gruposProduccion[key]) {
+        gruposProduccion[key] = {
+          titulo: item.titulo,
+          editorial: item.editorial,
+          items: [],
+          stats: { total: 0, pendientes: 0, imprimiendo: 0, encuadernando: 0, terminados: 0 }
+        };
+      }
+      gruposProduccion[key].items.push(item);
+      gruposProduccion[key].stats.total++;
+      
+      // Contadores simples
+      const est = item.estadoItem;
+      if (est === 'Terminado') gruposProduccion[key].stats.terminados++;
+      else if (est === 'Encuadernando') gruposProduccion[key].stats.encuadernando++;
+      else if (est === 'Imprimiendo / Armando') gruposProduccion[key].stats.imprimiendo++;
+      else gruposProduccion[key].stats.pendientes++;
+    });
+
+    renderizarProduccion(grupoAbiertoKey);
+
+  } catch (error) {
+    console.error("Error al cargar producción:", error);
+    tablaProduccionContainer.innerHTML = `<div class="alert alert-danger">Error al cargar la cola de producción.<br>${error.message}</div>`;
+  }
+};
+
+const renderizarProduccion = (grupoAbiertoKey = null) => {
+  const filtro = filtroProduccionLibro.value.toLowerCase();
+  
+  // Obtener estados seleccionados de los checkboxes
+  const checkboxesEstados = document.querySelectorAll('.check-filtro-estado:checked');
+  const estadosSeleccionados = Array.from(checkboxesEstados).map(cb => cb.value);
+  
+  // Filtrar grupos y recalcular items visibles por grupo
+  const clavesFiltradas = Object.keys(gruposProduccion).filter(key => {
+    const coincideTitulo = key.toLowerCase().includes(filtro);
+    // Verificar si el grupo tiene al menos un item que coincida con ALGUNO de los estados seleccionados
+    const tieneItemsEstado = gruposProduccion[key].items.some(i => estadosSeleccionados.includes(i.estadoItem));
+    
+    return coincideTitulo && tieneItemsEstado;
+  });
+
+  // Calcular estadísticas dinámicas
+  let totalLibros = 0;
+  let totalTerminados = 0;
+  
+  clavesFiltradas.forEach(key => {
+    totalLibros += gruposProduccion[key].stats.total;
+    totalTerminados += gruposProduccion[key].stats.terminados;
+  });
+
+  const statsContainer = document.getElementById('produccion-stats');
+  if (statsContainer) {
+    statsContainer.innerHTML = `📊 Resumen: <strong>${totalLibros}</strong> Libros en lista | ✅ Terminados: <strong>${totalTerminados}</strong>`;
+  }
+
+  if (clavesFiltradas.length === 0) {
+    tablaProduccionContainer.innerHTML = '<div class="alert alert-info">No hay libros pendientes que coincidan con la búsqueda.</div>';
+    return;
+  }
+
+  let html = `<div class="accordion" id="accordionProduccion">`;
+
+  clavesFiltradas.forEach((key, index) => {
+    const grupo = gruposProduccion[key];
+    const collapseId = `collapse-${index}`;
+
+    // Determinar si este grupo debe aparecer abierto
+    const isOpen = key === grupoAbiertoKey;
+    const showClass = isOpen ? 'show' : '';
+    const collapsedClass = isOpen ? '' : 'collapsed';
+    const ariaExpanded = isOpen ? 'true' : 'false';
+
+    // Filtrar items dentro del grupo para mostrar solo los que coinciden con el estado seleccionado
+    const itemsVisibles = grupo.items.filter(i => estadosSeleccionados.includes(i.estadoItem));
+    if (itemsVisibles.length === 0) return; // Si no hay items visibles en este grupo tras filtrar, saltar
+    
+    // Barra de progreso visual para el grupo
+    const porcentaje = Math.round((grupo.stats.terminados / grupo.stats.total) * 100);
+    const colorBarra = porcentaje === 100 ? 'bg-success' : 'bg-primary';
+
+    html += `
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button ${collapsedClass}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${ariaExpanded}">
+            <div class="d-flex w-100 justify-content-between align-items-center me-3">
+              <div>
+                <strong>${grupo.titulo}</strong> <small class="text-muted">(${grupo.editorial})</small>
+                <div class="progress mt-1" style="height: 5px; width: 100px;">
+                  <div class="progress-bar ${colorBarra}" role="progressbar" style="width: ${porcentaje}%"></div>
+                </div>
+              </div>
+              <div class="text-end">
+                <span class="badge bg-secondary rounded-pill">${grupo.stats.total} copias</span>
+                <small class="d-block text-muted" style="font-size: 0.7rem">
+                  ${grupo.stats.pendientes} Cola | ${grupo.stats.imprimiendo} Imp | ${grupo.stats.encuadernando} Enc | ${grupo.stats.terminados} OK
+                </small>
+              </div>
+            </div>
+          </button>
+        </h2>
+        <div id="${collapseId}" class="accordion-collapse collapse ${showClass}" data-bs-parent="#accordionProduccion">
+          <div class="accordion-body p-0">
+            <!-- Controles Masivos del Grupo -->
+            <div class="p-2 bg-light border-bottom d-flex justify-content-end align-items-center gap-2">
+              <small>Acción para seleccionados:</small>
+              <select class="form-select form-select-sm w-auto select-masivo-grupo">
+                <option value="">Cambiar todos a...</option>
+                <option value="En cola de impresión">En cola</option>
+                <option value="Imprimiendo / Armando">Imprimiendo</option>
+                <option value="Encuadernando">Encuadernando</option>
+                <option value="Terminado">Terminado</option>
+              </select>
+              <button class="btn btn-sm btn-dark btn-aplicar-masivo-grupo" data-group-key="${key}">Aplicar</button>
+            </div>
+
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 30px;"><input type="checkbox" class="form-check-input check-todos-grupo" data-group-key="${key}"></th>
+                  <th>Fecha</th><th>Cliente</th><th>Pedido</th><th>Estado Actual</th><th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsVisibles.map(item => {
+                  let badge = 'bg-secondary';
+                  let textoEstado = item.estadoItem;
+
+                  if(item.estadoItem === 'En cola de impresión') {
+                    badge = 'bg-warning text-dark';
+                    textoEstado = 'En cola';
+                  }
+                  if(item.estadoItem === 'Imprimiendo / Armando') {
+                    badge = 'bg-info text-dark';
+                    textoEstado = 'Imprimiendo';
+                  }
+                  if(item.estadoItem === 'Encuadernando') badge = 'bg-primary';
+                  if(item.estadoItem === 'Terminado') badge = 'bg-success';
+
+                  return `
+                  <tr>
+                    <td><input type="checkbox" class="form-check-input check-item-produccion" value="${item.pedidoId}|${item.itemIndex}" data-group-key="${key}"></td>
+                    <td><small>${item.fecha}</small></td>
+                    <td>${item.cliente}</td>
+                    <td>${item.pedidoCodigo}</td>
+                    <td><span class="badge ${badge}">${textoEstado}</span></td>
+                    <td>
+                      <select class="form-select form-select-sm select-estado-item" data-pedido-id="${item.pedidoId}" data-item-index="${item.itemIndex}" data-group-key="${key}">
+                        <option value="En cola de impresión" ${item.estadoItem === 'En cola de impresión' ? 'selected' : ''}>En cola</option>
+                        <option value="Imprimiendo / Armando" ${item.estadoItem === 'Imprimiendo / Armando' ? 'selected' : ''}>Imprimiendo</option>
+                        <option value="Encuadernando" ${item.estadoItem === 'Encuadernando' ? 'selected' : ''}>Encuadernando</option>
+                        <option value="Terminado" ${item.estadoItem === 'Terminado' ? 'selected' : ''}>Terminado</option>
+                      </select>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>'; // Cierre accordion
+  tablaProduccionContainer.innerHTML = html;
+};
+
+tablaProduccionContainer.addEventListener('click', async (e) => {
+  // 0. Checkbox "Seleccionar Todos" del grupo
+  if (e.target.classList.contains('check-todos-grupo')) {
+    const groupKey = e.target.dataset.groupKey;
+    // Buscar solo los checkboxes dentro de este acordeón/tabla específico
+    const checkboxes = tablaProduccionContainer.querySelectorAll(`.check-item-produccion[data-group-key="${groupKey}"]`);
+    checkboxes.forEach(cb => cb.checked = e.target.checked);
+  }
+
+  // Desmarcar "Seleccionar Todos" si uno individual se desmarca
+  if (e.target.classList.contains('check-item-produccion')) {
+    // Lógica opcional para UX, por ahora simple
+  }
+
+  // 2. Botón Masivo por Grupo
+  const btnMasivo = e.target.closest('.btn-aplicar-masivo-grupo');
+  if (btnMasivo) {
+    const key = btnMasivo.dataset.groupKey;
+    const select = btnMasivo.previousElementSibling; // El select está justo antes del botón
+    const nuevoEstado = select.value;
+
+    // Buscar checkboxes seleccionados en este grupo
+    const checkboxes = tablaProduccionContainer.querySelectorAll(`.check-item-produccion[data-group-key="${key}"]:checked`);
+    const seleccionados = Array.from(checkboxes).map(cb => {
+      const [pedidoId, itemIndex] = cb.value.split('|');
+      return { pedidoId, itemIndex: parseInt(itemIndex) };
+    });
+
+    if (!nuevoEstado) { alert("Seleccioná un estado destino."); return; }
+    if (seleccionados.length === 0) { alert("Seleccioná al menos un libro de la lista."); return; }
+
+    if (!confirm(`¿Cambiar ${seleccionados.length} libros a estado "${nuevoEstado}"?`)) return;
+
+    btnMasivo.disabled = true;
+    btnMasivo.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    // Ejecutar actualización masiva optimizada (agrupada por pedido)
+    await actualizarEstadoItemsMasivo(seleccionados, nuevoEstado);
+    
+    await cargarColaProduccion(key); // Recargar manteniendo el grupo abierto
+  }
+});
+
+tablaProduccionContainer.addEventListener('change', async (e) => {
+  // Cambio de estado individual via Select
+  if (e.target.classList.contains('select-estado-item')) {
+    const select = e.target;
+    const pedidoId = select.dataset.pedidoId;
+    const itemIndex = parseInt(select.dataset.itemIndex);
+    const groupKey = select.dataset.groupKey;
+    const nuevoEstado = select.value;
+
+    // Visual feedback: Spinner en la columna de estado
+    const row = select.closest('tr');
+    let originalBadgeHTML = '';
+    if (row && row.cells[4]) {
+      originalBadgeHTML = row.cells[4].innerHTML;
+      row.cells[4].innerHTML = '<div class="spinner-border spinner-border-sm text-primary" role="status"></div>';
+    }
+
+    select.disabled = true;
+    await actualizarEstadoItem(pedidoId, itemIndex, nuevoEstado, true, groupKey);
+    
+    // Si el elemento sigue existiendo (por error o falta de refresh), restauramos
+    if (document.body.contains(select)) {
+      select.disabled = false;
+      if (row && row.cells[4] && originalBadgeHTML) row.cells[4].innerHTML = originalBadgeHTML;
+    }
+  }
+});
+
+// Función auxiliar para actualizar un item en Firebase
+const actualizarEstadoItem = async (pedidoId, itemIndex, nuevoEstado, recargar = true, groupKey = null) => {
+  try {
+    // 1. Obtener el pedido actualizado de Firebase
+    const pedidoRef = doc(db, "pedidos", pedidoId);
+    const pedidoSnap = await getDoc(pedidoRef);
+
+    if (pedidoSnap.exists()) {
+      const pedidoData = pedidoSnap.data();
+      const items = pedidoData.items;
+
+      // 2. Cambiar el estado
+      items[itemIndex].estado = nuevoEstado;
+
+      // 3. Guardar cambios
+      await updateDoc(pedidoRef, { items: items });
+
+      if (recargar) {
+        // Verificar si el pedido se completó totalmente
+        const itemsTerminados = items.filter(i => i.estado === 'Terminado').length;
+        if (itemsTerminados === items.length && nuevoEstado === 'Terminado') {
+           // Buscar nombre cliente en memoria para el alert
+           const clienteNombre = clientesEnMemoria.find(c => c.id === pedidoData.id_cliente)?.nombre || 'Cliente';
+           alert(`🎉 ¡Atención! El pedido de ${clienteNombre} se ha completado en su totalidad.`);
+        }
+        await cargarColaProduccion(groupKey);
+      }
+    }
+  } catch (error) {
+    console.error("Error al actualizar item:", error);
+    if(recargar) alert("Error al actualizar el estado del libro.");
+  }
+};
+
+// Función optimizada para actualización masiva (evita condiciones de carrera)
+const actualizarEstadoItemsMasivo = async (listaItems, nuevoEstado) => {
+  // 1. Agrupar items por Pedido ID
+  const itemsPorPedido = {};
+  listaItems.forEach(item => {
+    if (!itemsPorPedido[item.pedidoId]) {
+      itemsPorPedido[item.pedidoId] = [];
+    }
+    itemsPorPedido[item.pedidoId].push(item.itemIndex);
+  });
+
+  // 2. Procesar cada pedido UNA sola vez
+  const promesas = Object.keys(itemsPorPedido).map(async (pedidoId) => {
+    try {
+      const pedidoRef = doc(db, "pedidos", pedidoId);
+      const pedidoSnap = await getDoc(pedidoRef);
+
+      if (pedidoSnap.exists()) {
+        const pedidoData = pedidoSnap.data();
+        const items = pedidoData.items;
+        const indicesAActualizar = itemsPorPedido[pedidoId];
+
+        // Actualizar todos los índices solicitados para este pedido
+        indicesAActualizar.forEach(index => {
+          if (items[index]) items[index].estado = nuevoEstado;
+        });
+
+        // Guardar una sola vez
+        await updateDoc(pedidoRef, { items: items });
+        
+        // Verificar si se completó el pedido (opcional, sin alert masivo para no spammear)
+      }
+    } catch (error) {
+      console.error(`Error actualizando pedido ${pedidoId}:`, error);
+    }
+  });
+
+  await Promise.all(promesas);
+};
+
+btnRefrescarProduccion.addEventListener('click', () => cargarColaProduccion());
+filtroProduccionLibro.addEventListener('input', renderizarProduccion);
+
+// Event listener para los nuevos checkboxes de filtro
+document.querySelectorAll('.check-filtro-estado').forEach(check => {
+  check.addEventListener('change', () => renderizarProduccion());
 });

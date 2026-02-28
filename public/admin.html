@@ -41,6 +41,12 @@
         <button class="nav-link" id="clientes-tab" data-bs-toggle="tab" data-bs-target="#clientes-tab-pane"
           type="button" role="tab" aria-controls="clientes-tab-pane" aria-selected="false">ABM Clientes</button>
       </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="lista-pedidos-tab" data-bs-toggle="tab" data-bs-target="#lista-pedidos-tab-pane" type="button" role="tab" aria-controls="lista-pedidos-tab-pane" aria-selected="false">Lista de Pedidos</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="produccion-tab" data-bs-toggle="tab" data-bs-target="#produccion-tab-pane" type="button" role="tab" aria-controls="produccion-tab-pane" aria-selected="false">Cola de Producción</button>
+      </li>
     </ul>
 
     <!-- Contenido de las Pestañas -->
@@ -164,6 +170,78 @@
         </div>
       </div>
 
+      <!-- Pestaña 4: Lista de Pedidos -->
+      <div class="tab-pane fade" id="lista-pedidos-tab-pane" role="tabpanel" aria-labelledby="lista-pedidos-tab" tabindex="0">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Historial de Pedidos</span>
+            <button class="btn btn-sm btn-outline-primary" id="btn-refrescar-pedidos"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+          </div>
+          <div class="card-body">
+            <!-- Filtros y Acciones Masivas -->
+            <div class="row g-2 mb-3 align-items-center">
+              <div class="col-md-4">
+                <input type="text" class="form-control" id="filtro-pedidos-texto" placeholder="🔍 Buscar por cliente o código...">
+              </div>
+              <div class="col-md-3">
+                <select class="form-select" id="filtro-pedidos-estado">
+                  <option value="">Todos los estados</option>
+                  <option value="En cola de impresión">En cola de impresión</option>
+                  <option value="Imprimiendo / Armando">Imprimiendo / Armando</option>
+                  <option value="Encuadernando">Encuadernando</option>
+                  <option value="Listo para retirar">Listo para retirar</option>
+                  <option value="Entregado">Entregado</option>
+                </select>
+              </div>
+              <div class="col-md-5 d-flex justify-content-md-end gap-2">
+                <select class="form-select w-auto" id="accion-masiva-estado"><option value="">Acción Masiva...</option><option value="En cola de impresión">Marcar como En cola</option><option value="Imprimiendo / Armando">Marcar como Imprimiendo</option><option value="Encuadernando">Marcar como Encuadernando</option><option value="Listo para retirar">Marcar como Listo</option><option value="Entregado">Marcar como Entregado</option></select>
+                <button class="btn btn-primary" id="btn-aplicar-masivo" disabled>Aplicar</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <div id="tabla-pedidos-container">
+                <!-- Aquí se cargará la tabla vía JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pestaña 5: Cola de Producción -->
+      <div class="tab-pane fade" id="produccion-tab-pane" role="tabpanel" aria-labelledby="produccion-tab" tabindex="0">
+        <div class="card">
+          <div class="card-header bg-warning-subtle">Cola de Impresión / Producción</div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-5">
+                <input type="text" id="filtro-produccion-libro" class="form-control form-control-lg" placeholder="🔍 Filtrar por Título del Libro (Ej: Matemática 1)...">
+              </div>
+              <div class="col-md-3">
+                <div class="dropdown w-100">
+                  <button class="btn btn-outline-secondary btn-lg dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-funnel"></i> Filtrar Estados
+                  </button>
+                  <ul class="dropdown-menu p-3 w-100">
+                    <li><div class="form-check"><input class="form-check-input check-filtro-estado" type="checkbox" value="En cola de impresión" id="f-cola" checked><label class="form-check-label" for="f-cola">En cola</label></div></li>
+                    <li><div class="form-check"><input class="form-check-input check-filtro-estado" type="checkbox" value="Imprimiendo / Armando" id="f-imp" checked><label class="form-check-label" for="f-imp">Imprimiendo</label></div></li>
+                    <li><div class="form-check"><input class="form-check-input check-filtro-estado" type="checkbox" value="Encuadernando" id="f-enc" checked><label class="form-check-label" for="f-enc">Encuadernando</label></div></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><div class="form-check"><input class="form-check-input check-filtro-estado" type="checkbox" value="Terminado" id="f-term"><label class="form-check-label" for="f-term">Terminado</label></div></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="col-md-4 text-end">
+                <button class="btn btn-outline-primary btn-lg" id="btn-refrescar-produccion"><i class="bi bi-arrow-clockwise"></i> Actualizar Lista</button>
+              </div>
+            </div>
+            <div id="produccion-stats" class="mb-3 fs-5"></div>
+            <div class="table-responsive">
+              <div id="tabla-produccion-container"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </main>
 
@@ -218,6 +296,25 @@
           </form>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary" id="btn-guardar-edicion-cliente">Guardar Cambios</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Detalle de Pedido -->
+  <div class="modal fade" id="modalDetallePedido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Detalle del Pedido #<span id="detalle-pedido-codigo"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-light border" id="detalle-pedido-info-cliente"></div>
+          <h6>Libros solicitados:</h6>
+          <ul class="list-group mb-3" id="detalle-pedido-lista-items"></ul>
+          <div class="text-end fw-bold" id="detalle-pedido-totales"></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button></div>
       </div>
     </div>
   </div>

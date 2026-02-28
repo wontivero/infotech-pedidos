@@ -91,6 +91,51 @@
                 <li>Registro rápido de clientes con Nombre, Teléfono y Colegio.</li>
                 <li>Estos clientes aparecen luego en el buscador del Gestor de Pedidos.</li>
             </ul>
+
+            <hr>
+
+            <h4>4. Lista de Pedidos</h4>
+            <ul>
+                <li><strong>Visión General:</strong> Tabla con todos los pedidos históricos ordenados por fecha.</li>
+                <li><strong>Estados y Colores:</strong>
+                    <ul>
+                        <li><span class="badge bg-warning text-dark">En cola</span> Pedido recién ingresado.</li>
+                        <li><span class="badge bg-info text-dark">Imprimiendo</span> En proceso de producción.</li>
+                        <li><span class="badge bg-primary">Encuadernando</span> En proceso de anillado/terminación.</li>
+                        <li><span class="badge bg-success">Listo para retirar</span> Terminado, esperando al cliente.</li>
+                        <li><span class="badge bg-secondary">Entregado</span> Finalizado.</li>
+                    </ul>
+                </li>
+                <li><strong>Progreso:</strong> Columna que muestra cuántos libros están terminados del total (ej: 2/3). Si el pedido está completo, la fila se pone verde.</li>
+                <li><strong>Acciones:</strong>
+                    <ul>
+                        <li><i class="bi bi-eye"></i> <strong>Ver Detalle:</strong> Muestra qué libros pidió el cliente y los montos.</li>
+                        <li><i class="bi bi-whatsapp"></i> <strong>Avisar Cliente:</strong> Si el pedido está listo, aparece un botón verde para copiar el mensaje de aviso a WhatsApp.</li>
+                        <li><strong>Cambio de Estado:</strong> Se puede cambiar el estado general del pedido desde el botón desplegable.</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <hr>
+
+            <h4>5. Cola de Producción</h4>
+            <p>Herramienta para organizar el trabajo del taller, agrupando pedidos por libro.</p>
+            <ul>
+                <li><strong>Agrupación Inteligente:</strong> Los libros se agrupan por Título. Si 10 clientes pidieron "Matemática 1", verás una sola entrada con el total de copias a realizar.</li>
+                <li><strong>Filtros:</strong>
+                    <ul>
+                        <li><strong>Por Título:</strong> Escribí en el buscador para encontrar un libro específico.</li>
+                        <li><strong>Por Estado:</strong> Usá el botón "Filtrar Estados" para ver solo lo que está "En cola" o "Encuadernando", por ejemplo. Podés seleccionar varios a la vez.</li>
+                    </ul>
+                </li>
+                <li><strong>Gestión de Estados:</strong>
+                    <ul>
+                        <li><strong>Individual:</strong> Cada libro tiene un selector para cambiar su estado (En cola -> Imprimiendo -> Encuadernando -> Terminado).</li>
+                        <li><strong>Masiva:</strong> Dentro de cada grupo, podés seleccionar varios libros (o todos) y cambiarlos de estado con un solo clic usando el selector de "Acción para seleccionados".</li>
+                    </ul>
+                </li>
+                <li><strong>Indicadores Visuales:</strong> Barras de progreso por libro y contadores de stock en tiempo real.</li>
+            </ul>
         </div>
     </div>
 
