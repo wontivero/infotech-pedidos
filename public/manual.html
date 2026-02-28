@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manual de Usuario - InfoTech</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .doc-section { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 2rem; }
+        .icon-box { font-size: 2rem; color: #0d6efd; margin-bottom: 1rem; }
+        h4 { margin-top: 1.5rem; color: #495057; }
+        h5 { color: #0d6efd; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="bi bi-book-half"></i> InfoTech - Manual de Usuario</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Introducción -->
+        <div class="doc-section">
+            <h2><i class="bi bi-info-circle text-primary"></i> Introducción</h2>
+            <p class="lead">Bienvenido a la documentación del sistema de gestión de pedidos para InfoTech.</p>
+            <p>Este sistema permite gestionar clientes, libros, presupuestos y pedidos de impresión, además de ofrecer una vista pública para que los clientes consulten el estado de sus encargos.</p>
+        </div>
+
+        <!-- Vista Pública -->
+        <div class="doc-section">
+            <h3><i class="bi bi-globe text-success"></i> Vista Pública (Rastreo)</h3>
+            <p>Accesible desde la página principal (<code>index.html</code>).</p>
+            <ul>
+                <li><strong>Funcionalidad:</strong> Permite a los clientes ingresar su <strong>Código de Seguimiento</strong> (ej: <code>12345</code>) para ver el estado actual de su pedido y el saldo pendiente.</li>
+                <li><strong>Estados posibles:</strong> En cola de impresión, Imprimiendo / Armando, Listo para retirar, Entregado.</li>
+            </ul>
+        </div>
+
+        <!-- Panel de Administración -->
+        <div class="doc-section">
+            <h3><i class="bi bi-shield-lock-fill text-danger"></i> Panel de Administración</h3>
+            <p>Accesible desde <code>admin.html</code>. Se divide en tres pestañas principales:</p>
+
+            <hr>
+
+            <h4>1. Gestor de Pedidos</h4>
+            <p>Es la pantalla principal de trabajo para la toma de pedidos.</p>
+            
+            <h5><i class="bi bi-search"></i> Buscadores Inteligentes</h5>
+            <ul>
+                <li><strong>Clientes:</strong> Buscá por nombre o teléfono. El sistema filtra en tiempo real.</li>
+                <li><strong>Libros:</strong> Buscá por título, editorial o precio. Podés navegar con las flechas del teclado y presionar <code>Enter</code> para agregar al carrito rápidamente.</li>
+            </ul>
+
+            <h5><i class="bi bi-cart"></i> Carrito y Totales</h5>
+            <ul>
+                <li>Los libros agregados aparecen en una tabla con su miniatura (hacé click en la imagen para agrandarla).</li>
+                <li>Podés eliminar ítems con el botón de basura.</li>
+                <li><strong>Cálculo de Seña:</strong> Al ingresar el monto en "Seña Pagada", el "Saldo Pendiente" se actualiza automáticamente.</li>
+            </ul>
+
+            <h5><i class="bi bi-file-earmark-text"></i> Presupuestos</h5>
+            <ul>
+                <li><strong>Generar Presupuesto:</strong> Guarda los ítems actuales bajo un código que empieza con <strong>P</strong> (ej: <code>P12345</code>). Copia automáticamente un mensaje formateado para WhatsApp al portapapeles.</li>
+                <li><strong>Cargar Presupuesto:</strong> Ingresá el código (ej: <code>P12345</code>) en el campo superior y clickeá "Cargar". Esto recupera el cliente, los libros y los montos para finalizar la venta rápidamente.</li>
+            </ul>
+
+            <h5><i class="bi bi-check-circle"></i> Generar Pedido</h5>
+            <ul>
+                <li>Guarda el pedido definitivo en la base de datos.</li>
+                <li>Genera un <strong>Código de Seguimiento numérico</strong> (ej: <code>54821</code>).</li>
+                <li>Copia al portapapeles un mensaje de confirmación listo para enviar al cliente con el link de seguimiento.</li>
+            </ul>
+
+            <hr>
+
+            <h4>2. ABM Libros</h4>
+            <ul>
+                <li>Permite cargar nuevos libros al catálogo.</li>
+                <li><strong>Imagen:</strong> Se sube a la nube y se muestra una miniatura en las listas.</li>
+                <li>Campos: Título, Páginas, Editorial, Precio.</li>
+            </ul>
+
+            <hr>
+
+            <h4>3. ABM Clientes</h4>
+            <ul>
+                <li>Registro rápido de clientes con Nombre, Teléfono y Colegio.</li>
+                <li>Estos clientes aparecen luego en el buscador del Gestor de Pedidos.</li>
+            </ul>
+        </div>
+    </div>
+
+    <footer class="text-center py-4 text-muted">
+        <small>&copy; 2024 InfoTech - Sistema de Gestión</small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

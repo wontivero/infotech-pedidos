@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InfoTech - Panel de Control</title>
+
+  <!-- Bootstrap CSS via CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+  <!-- Bootstrap Icons via CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+
+<body>
+
+  <!-- 1. Navbar Superior -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">
+        <i class="bi bi-shield-lock-fill"></i>
+        InfoTech - Panel de Control
+      </a>
+    </div>
+  </nav>
+
+  <main class="container mt-4">
+    <!-- 2. Sistema de Navegación por Pestañas -->
+    <ul class="nav nav-tabs" id="adminTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="pedidos-tab" data-bs-toggle="tab" data-bs-target="#pedidos-tab-pane"
+          type="button" role="tab" aria-controls="pedidos-tab-pane" aria-selected="true">Gestor de Pedidos</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="libros-tab" data-bs-toggle="tab" data-bs-target="#libros-tab-pane" type="button"
+          role="tab" aria-controls="libros-tab-pane" aria-selected="false">ABM Libros</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="clientes-tab" data-bs-toggle="tab" data-bs-target="#clientes-tab-pane"
+          type="button" role="tab" aria-controls="clientes-tab-pane" aria-selected="false">ABM Clientes</button>
+      </li>
+    </ul>
+
+    <!-- Contenido de las Pestañas -->
+    <div class="tab-content p-3 border border-top-0" id="adminTabContent">
+
+      <!-- Pestaña 1: Gestor de Pedidos (Activa por defecto) -->
+      <div class="tab-pane fade show active" id="pedidos-tab-pane" role="tabpanel" aria-labelledby="pedidos-tab"
+        tabindex="0">
+        <div class="row g-4">
+          <!-- Columna Izquierda: Armado del carrito -->
+          <div class="col-md-7">
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">Armado del Pedido</h5>
+                <div class="input-group mb-3">
+                  <input type="text" class="form-control" id="input-presupuesto-codigo" placeholder="Cargar Presupuesto (Código)" value="P">
+                  <button class="btn btn-outline-secondary" type="button" id="btn-cargar-presupuesto"><i class="bi bi-download"></i> Cargar</button>
+                </div>
+                <form id="form-carrito">
+                  <div class="mb-3 position-relative">
+                    <label for="input-buscar-cliente" class="form-label">Buscar Cliente (Nombre, Teléfono...)</label>
+                    <input type="text" class="form-control" id="input-buscar-cliente" placeholder="Escribí para buscar..." autocomplete="off">
+                    <div id="lista-resultados-clientes" class="list-group position-absolute w-100 shadow" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none;"></div>
+                  </div>
+                  <div class="mb-3 position-relative">
+                    <label for="input-buscar-libro" class="form-label">Buscar Libro (Título, Editorial...)</label>
+                    <input type="text" class="form-control" id="input-buscar-libro" placeholder="Escribí para buscar..." autocomplete="off">
+                    <!-- Contenedor de resultados flotante -->
+                    <div id="lista-resultados-libros" class="list-group position-absolute w-100 shadow" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none;"></div>
+                  </div>
+                </form>
+                <hr>
+                <h6>Libros en el pedido actual</h6>
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th scope="col" style="width: 60px;"></th>
+                      <th scope="col">Libro</th>
+                      <th scope="col">Precio</th>
+                      <th scope="col">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabla-carrito">
+                    <!-- Filas del carrito se inyectarán aquí -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Columna Derecha: Resumen y Cobro -->
+          <div class="col-md-5">
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">Resumen y Cobro</h5>
+                <form id="form-resumen-cobro">
+                  <div class="mb-3">
+                    <label for="total-pedido" class="form-label">Total</label>
+                    <input type="text" id="total-pedido" class="form-control" value="$ 0.00" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label for="sena-pagada" class="form-label">Seña Pagada</label>
+                    <input type="number" id="sena-pagada" class="form-control" placeholder="0.00" min="0">
+                  </div>
+                  <div class="mb-3">
+                    <label for="saldo-pendiente" class="form-label">Saldo Pendiente</label>
+                    <input type="text" id="saldo-pendiente" class="form-control" value="$ 0.00" readonly>
+                  </div>
+                  <div class="d-grid">
+                    <button type="submit" id="btn-generar-pedido" class="btn btn-success btn-lg">Generar Pedido</button>
+                    <button type="button" id="btn-generar-presupuesto" class="btn btn-info btn-lg text-white">Generar Presupuesto</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pestaña 2: ABM Libros -->
+      <div class="tab-pane fade" id="libros-tab-pane" role="tabpanel" aria-labelledby="libros-tab" tabindex="0">
+        <div class="card">
+          <div class="card-header">Gestión de Libros</div>
+          <div class="card-body">
+            <h5 class="card-title">Cargar Nuevo Libro</h5>
+            <form id="form-nuevo-libro">
+              <div class="row">
+                <div class="col-md-6 mb-3"><input type="text" class="form-control" id="libro-titulo" placeholder="Título" required></div>
+                <div class="col-md-6 mb-3"><input type="number" class="form-control" id="libro-paginas" placeholder="Cantidad de Páginas"></div>
+                <div class="col-md-6 mb-3"><input type="text" class="form-control" id="libro-editorial" placeholder="Editorial"></div>
+                <div class="col-md-6 mb-3"><input type="number" class="form-control" id="libro-precio" placeholder="Precio" step="0.01" required></div>
+                <div class="col-12 mb-3"><label for="libro-imagen" class="form-label">Imagen de Portada</label><input type="file" class="form-control" id="libro-imagen" accept="image/*"></div>
+              </div>
+              <button type="submit" id="btn-guardar-libro" class="btn btn-primary">Guardar Libro</button>
+            </form>
+          </div>
+        </div>
+        <div id="lista-libros" class="mt-4">
+          <!-- La lista de libros cargados se renderizará aquí -->
+        </div>
+      </div>
+
+      <!-- Pestaña 3: ABM Clientes -->
+      <div class="tab-pane fade" id="clientes-tab-pane" role="tabpanel" aria-labelledby="clientes-tab" tabindex="0">
+        <div class="card">
+          <div class="card-header">Gestión de Clientes</div>
+          <div class="card-body">
+            <h5 class="card-title">Registrar Nuevo Cliente</h5>
+            <form id="form-nuevo-cliente">
+              <div class="row">
+                <div class="col-md-6 mb-3"><input type="text" class="form-control" id="cliente-nombre" placeholder="Nombre Completo" required></div>
+                <div class="col-md-6 mb-3"><input type="tel" class="form-control" id="cliente-telefono" placeholder="Teléfono"></div>
+                <div class="col-md-12 mb-3"><input type="text" class="form-control" id="cliente-colegio" placeholder="Colegio / Institución"></div>
+              </div>
+              <button type="submit" id="btn-guardar-cliente" class="btn btn-primary">Guardar Cliente</button>
+            </form>
+          </div>
+        </div>
+        <div id="lista-clientes" class="mt-4">
+          <!-- La lista de clientes registrados se renderizará aquí -->
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Modal para ver imagen ampliada -->
+  <div class="modal fade" id="modalImagen" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body p-0">
+          <button type="button" class="btn-close position-absolute top-0 end-0 m-2 bg-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          <img src="" id="imagen-ampliada" class="img-fluid w-100" alt="Imagen ampliada">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar Libro -->
+  <div class="modal fade" id="modalEditarLibro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Libro</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="form-editar-libro">
+            <input type="hidden" id="edit-libro-id">
+            <div class="mb-3"><label class="form-label">Título</label><input type="text" class="form-control" id="edit-libro-titulo"></div>
+            <div class="mb-3"><label class="form-label">Páginas</label><input type="number" class="form-control" id="edit-libro-paginas"></div>
+            <div class="mb-3"><label class="form-label">Editorial</label><input type="text" class="form-control" id="edit-libro-editorial"></div>
+            <div class="mb-3"><label class="form-label">Precio</label><input type="number" class="form-control" id="edit-libro-precio" step="0.01"></div>
+          </form>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary" id="btn-guardar-edicion-libro">Guardar Cambios</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar Cliente -->
+  <div class="modal fade" id="modalEditarCliente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Cliente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="form-editar-cliente">
+            <input type="hidden" id="edit-cliente-id">
+            <div class="mb-3"><label class="form-label">Nombre</label><input type="text" class="form-control" id="edit-cliente-nombre"></div>
+            <div class="mb-3"><label class="form-label">Teléfono</label><input type="tel" class="form-control" id="edit-cliente-telefono"></div>
+            <div class="mb-3"><label class="form-label">Colegio</label><input type="text" class="form-control" id="edit-cliente-colegio"></div>
+          </form>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary" id="btn-guardar-edicion-cliente">Guardar Cambios</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS Bundle (Popper.js included) via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+    crossorigin="anonymous"></script>
+
+  <!-- Tu script de Firebase y lógica del panel -->
+  <script type="module" src="admin.js"></script>
+
+</body>
+
+</html>

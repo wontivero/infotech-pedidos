@@ -1,0 +1,17 @@
+# Logs de sistema y Firebase
+firebase-debug.log*
+*.log
+
+# Carpetas de dependencias (si usas Node.js en el futuro)
+node_modules/
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Configuraciones de editores de código (VS Code, etc)
+.vscode/
+.idea/
+
+# Cache de Firebase (si usas hosting o emuladores)
+.firebase/
