@@ -65,6 +65,9 @@
         <i class="bi bi-shield-lock-fill"></i>
         InfoTech - Panel de Control
       </a>
+      <a href="manual.html" target="_blank" class="btn btn-outline-light btn-sm ms-auto" title="Ver Manual de Usuario">
+        <i class="bi bi-question-circle-fill"></i> Ayuda
+      </a>
     </div>
   </nav>
 
@@ -88,6 +91,9 @@
       </li>
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="produccion-tab" data-bs-toggle="tab" data-bs-target="#produccion-tab-pane" type="button" role="tab" aria-controls="produccion-tab-pane" aria-selected="false">Cola de Producción</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-tab-pane" type="button" role="tab" aria-controls="config-tab-pane" aria-selected="false"><i class="bi bi-gear-fill"></i> Configuración</button>
       </li>
     </ul>
 
@@ -298,6 +304,45 @@
             <div class="table-responsive">
               <div id="tabla-produccion-container"></div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pestaña 6: Configuración -->
+      <div class="tab-pane fade" id="config-tab-pane" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
+        <div class="card">
+          <div class="card-header">Datos del Sistema</div>
+          <div class="card-body">
+            <h5 class="card-title mb-4">Datos de Transferencia (para Presupuestos)</h5>
+            
+            <!-- Resumen de Configuración Actual -->
+            <div id="config-actual-info" class="alert alert-info border-0 shadow-sm mb-4 d-none">
+              <div class="d-flex align-items-center mb-2">
+                <i class="bi bi-info-circle-fill fs-4 me-2"></i>
+                <h6 class="mb-0 fw-bold">Configuración Actual Activa</h6>
+              </div>
+              <div class="ps-4 ms-1 border-start border-2 border-info">
+                <p class="mb-1"><strong>Alias:</strong> <span id="lbl-config-alias" class="fw-bold">...</span></p>
+                <p class="mb-1"><strong>Banco:</strong> <span id="lbl-config-banco">...</span></p>
+                <p class="mb-0"><strong>Titular:</strong> <span id="lbl-config-titular">...</span></p>
+              </div>
+            </div>
+
+            <form id="form-configuracion">
+              <div class="mb-3">
+                <label for="config-alias" class="form-label">Alias (CBU/CVU)</label>
+                <input type="text" class="form-control" id="config-alias" placeholder="Ej: MI.ALIAS.MP">
+              </div>
+              <div class="mb-3">
+                <label for="config-banco" class="form-label">Banco / Billetera</label>
+                <input type="text" class="form-control" id="config-banco" placeholder="Ej: Mercado Pago">
+              </div>
+              <div class="mb-3">
+                <label for="config-titular" class="form-label">Titular de la Cuenta</label>
+                <input type="text" class="form-control" id="config-titular" placeholder="Nombre del titular">
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Guardar Configuración</button>
+            </form>
           </div>
         </div>
       </div>

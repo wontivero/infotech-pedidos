@@ -1,6 +1,6 @@
 // 1. Importaciones del SDK de Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, orderBy, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-storage.js";
 
 // 2. Configuración de Firebase (reemplazar con tus credenciales)
@@ -94,6 +94,71 @@ const actualizarDatalistTitulos = () => {
     datalist.appendChild(option);
   });
 };
+
+// --- LÓGICA DE CONFIGURACIÓN ---
+
+let configuracionGlobal = {
+  alias: 'INFOTECH.PAGOS', // Valor por defecto
+  banco: '',
+  titular: ''
+};
+
+const actualizarVistaConfiguracion = () => {
+  const lblAlias = document.getElementById('lbl-config-alias');
+  const lblBanco = document.getElementById('lbl-config-banco');
+  const lblTitular = document.getElementById('lbl-config-titular');
+  const container = document.getElementById('config-actual-info');
+
+  if (lblAlias) lblAlias.textContent = configuracionGlobal.alias || 'No configurado';
+  if (lblBanco) lblBanco.textContent = configuracionGlobal.banco || '-';
+  if (lblTitular) lblTitular.textContent = configuracionGlobal.titular || '-';
+  if (container) container.classList.remove('d-none');
+};
+
+const cargarConfiguracion = async () => {
+  try {
+    const docRef = doc(db, "configuracion", "general");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      configuracionGlobal = { ...configuracionGlobal, ...docSnap.data() };
+      
+      // Llenar formulario si existe en el DOM
+      const inputAlias = document.getElementById('config-alias');
+      if (inputAlias) {
+        inputAlias.value = configuracionGlobal.alias || '';
+        document.getElementById('config-banco').value = configuracionGlobal.banco || '';
+        document.getElementById('config-titular').value = configuracionGlobal.titular || '';
+      }
+
+      // Actualizar el recuadro informativo
+      actualizarVistaConfiguracion();
+    }
+  } catch (error) {
+    console.error("Error cargando configuración:", error);
+  }
+};
+
+const formConfiguracion = document.getElementById('form-configuracion');
+if (formConfiguracion) {
+  formConfiguracion.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nuevoConfig = {
+      alias: document.getElementById('config-alias').value,
+      banco: document.getElementById('config-banco').value,
+      titular: document.getElementById('config-titular').value
+    };
+
+    try {
+      await setDoc(doc(db, "configuracion", "general"), nuevoConfig);
+      configuracionGlobal = nuevoConfig;
+      actualizarVistaConfiguracion(); // Refrescar el recuadro visual
+      Swal.fire('Guardado', 'La configuración se actualizó correctamente.', 'success');
+    } catch (error) {
+      console.error("Error guardando configuración:", error);
+      Swal.fire('Error', 'No se pudo guardar la configuración.', 'error');
+    }
+  });
+}
 
 /**
  * Sube un archivo a Firebase Storage y devuelve la URL de descarga.
@@ -260,6 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarLibrosEnMemoria();
   cargarPedidos(); // Cargar pedidos al inicio
   cargarListasReferencia(); // Cargar autocompletado
+  cargarConfiguracion(); // Cargar configuración del sistema (Alias, etc.)
   inputSena.value = ""; // Limpiar seña al recargar
   actualizarTotales();
 
@@ -789,6 +855,11 @@ btnGenerarPedido.addEventListener('click', async (e) => {
     return;
   }
 
+  // Feedback visual (Spinner)
+  const originalText = btnGenerarPedido.innerHTML;
+  btnGenerarPedido.disabled = true;
+  btnGenerarPedido.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+
   const saldo = totalPedido - sena;
 
   // "Aplanar" el carrito: Convertir items agrupados (cantidad > 1) en items individuales para la base de datos
@@ -856,6 +927,9 @@ btnGenerarPedido.addEventListener('click', async (e) => {
   } catch (error) {
     console.error("Error al generar pedido:", error);
     Swal.fire('Error', 'Hubo un problema al generar el pedido.', 'error');
+  } finally {
+    btnGenerarPedido.disabled = false;
+    btnGenerarPedido.innerHTML = originalText;
   }
 });
 
@@ -865,59 +939,72 @@ btnGenerarPresupuesto.addEventListener('click', async () => {
     return;
   }
 
-  const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 });
-  const senaSugerida = totalPedido / 2;
-  const codigoPresupuesto = generarCodigo('P'); // Generamos un código único para el presupuesto (Ej: P12345)
+  // Feedback visual (Spinner)
+  const originalText = btnGenerarPresupuesto.innerHTML;
+  btnGenerarPresupuesto.disabled = true;
+  btnGenerarPresupuesto.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generando...';
 
-  // Expandir items para guardar en BD (mismo formato que pedidos)
-  const itemsExpandidos = carrito.flatMap(item => {
-    const itemsIndividuales = [];
-    for (let i = 0; i < item.cantidad; i++) {
-      const { cantidad, ...itemSinCantidad } = item;
-      itemsIndividuales.push(itemSinCantidad);
-    }
-    return itemsIndividuales;
-  });
-
-  // Guardar presupuesto en Firestore
   try {
-    const presupuestoData = {
-      codigo: codigoPresupuesto,
-      items: itemsExpandidos,
-      total: totalPedido,
-      cliente: clienteSeleccionado ? { id: clienteSeleccionado.id, nombre: clienteSeleccionado.nombre, telefono: clienteSeleccionado.telefono } : null,
-      fecha: new Date()
-    };
-    await addDoc(collection(db, "presupuestos"), presupuestoData);
-  } catch (error) {
-    console.error("Error al guardar presupuesto:", error);
-    // No bloqueamos el flujo si falla el guardado, solo avisamos en consola
+    const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 });
+    const senaSugerida = totalPedido / 2;
+    const codigoPresupuesto = generarCodigo('P'); // Generamos un código único para el presupuesto (Ej: P12345)
+
+    // Expandir items para guardar en BD (mismo formato que pedidos)
+    const itemsExpandidos = carrito.flatMap(item => {
+      const itemsIndividuales = [];
+      for (let i = 0; i < item.cantidad; i++) {
+        const { cantidad, ...itemSinCantidad } = item;
+        itemsIndividuales.push(itemSinCantidad);
+      }
+      return itemsIndividuales;
+    });
+
+    // Guardar presupuesto en Firestore
+    try {
+      const presupuestoData = {
+        codigo: codigoPresupuesto,
+        items: itemsExpandidos,
+        total: totalPedido,
+        cliente: clienteSeleccionado ? { id: clienteSeleccionado.id, nombre: clienteSeleccionado.nombre, telefono: clienteSeleccionado.telefono } : null,
+        fecha: new Date()
+      };
+      await addDoc(collection(db, "presupuestos"), presupuestoData);
+    } catch (error) {
+      console.error("Error al guardar presupuesto:", error);
+      // No bloqueamos el flujo si falla el guardado, solo avisamos en consola
+    }
+
+    let mensaje = `Hola! 👋 Te paso el presupuesto solicitado (Ref: ${codigoPresupuesto}):\n\n`;
+
+    carrito.forEach(item => {
+      const totalItem = item.precio * item.cantidad;
+      mensaje += `📚 *${item.titulo}* (x${item.cantidad})\n   _${item.editorial || 'Ed. Varios'}_ — ${formatter.format(totalItem)}\n`;
+    });
+
+    mensaje += `\n✅ *Impresión a color y anillado incluido.*\n`;
+    mensaje += `💰 *Total: ${formatter.format(totalPedido)}*\n`;
+    mensaje += `-----------------------------------\n`;
+    mensaje += `📝 Para encargarlo necesitamos:\n`;
+    mensaje += `   • Nombre del alumno\n`;
+    mensaje += `   • Colegio\n`;
+    mensaje += `   • Seña de ${formatter.format(senaSugerida)} (50%)\n\n`;
+    mensaje += `💳 *Alias:* ${configuracionGlobal.alias}\n`;
+    if (configuracionGlobal.banco) mensaje += `🏦 *Banco:* ${configuracionGlobal.banco}\n`;
+    if (configuracionGlobal.titular) mensaje += `👤 *Titular:* ${configuracionGlobal.titular}\n`;
+    
+    mensaje += `(Por favor enviar comprobante)`;
+
+    // Copiar al portapapeles y avisar
+    navigator.clipboard.writeText(mensaje);
+    Swal.fire({
+      title: '¡Presupuesto Listo!',
+      html: `Referencia: <strong>${codigoPresupuesto}</strong><br>Copiado al portapapeles para enviar por WhatsApp.`,
+      icon: 'success'
+    });
+  } finally {
+    btnGenerarPresupuesto.disabled = false;
+    btnGenerarPresupuesto.innerHTML = originalText;
   }
-
-  let mensaje = `Hola! 👋 Te paso el presupuesto solicitado (Ref: ${codigoPresupuesto}):\n\n`;
-
-  carrito.forEach(item => {
-    const totalItem = item.precio * item.cantidad;
-    mensaje += `📚 *${item.titulo}* (x${item.cantidad})\n   _${item.editorial || 'Ed. Varios'}_ — ${formatter.format(totalItem)}\n`;
-  });
-
-  mensaje += `\n✅ *Impresión a color y anillado incluido.*\n`;
-  mensaje += `💰 *Total: ${formatter.format(totalPedido)}*\n`;
-  mensaje += `-----------------------------------\n`;
-  mensaje += `📝 Para encargarlo necesitamos:\n`;
-  mensaje += `   • Nombre del alumno\n`;
-  mensaje += `   • Colegio\n`;
-  mensaje += `   • Seña de ${formatter.format(senaSugerida)} (50%)\n\n`;
-  mensaje += `💳 *Alias:* INFOTECH.PAGOS\n`;
-  mensaje += `(Por favor enviar comprobante)`;
-
-  // Copiar al portapapeles y avisar
-  navigator.clipboard.writeText(mensaje);
-  Swal.fire({
-    title: '¡Presupuesto Listo!',
-    html: `Referencia: <strong>${codigoPresupuesto}</strong><br>Copiado al portapapeles para enviar por WhatsApp.`,
-    icon: 'success'
-  });
 });
 
 // Atajos de teclado (F1 y F2)
