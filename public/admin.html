@@ -12,12 +12,54 @@
 
   <!-- Bootstrap Icons via CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <style>
+    body {
+      background-color: #f0f2f5; /* Fondo gris suave para reducir el brillo blanco */
+    }
+    .navbar {
+      background: linear-gradient(135deg, #0d6efd 0%, #0043a8 100%); /* Degradado azul profesional */
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+    .nav-tabs {
+      border-bottom: none;
+      gap: 5px;
+    }
+    .nav-tabs .nav-link {
+      border: none;
+      background-color: rgba(255, 255, 255, 0.5);
+      color: #495057;
+      font-weight: 500;
+      border-radius: 8px;
+      transition: all 0.2s ease-in-out;
+    }
+    .nav-tabs .nav-link:hover {
+      background-color: #e9ecef;
+      color: #0d6efd;
+    }
+    .nav-tabs .nav-link.active {
+      background-color: #fff;
+      color: #0d6efd;
+      font-weight: 600;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .card-header {
+      background-color: transparent;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+      font-weight: 600;
+    }
+  </style>
 </head>
 
 <body>
 
   <!-- 1. Navbar Superior -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">
         <i class="bi bi-shield-lock-fill"></i>
@@ -50,80 +92,98 @@
     </ul>
 
     <!-- Contenido de las Pestañas -->
-    <div class="tab-content p-3 border border-top-0" id="adminTabContent">
+    <div class="tab-content pt-2" id="adminTabContent">
 
       <!-- Pestaña 1: Gestor de Pedidos (Activa por defecto) -->
       <div class="tab-pane fade show active" id="pedidos-tab-pane" role="tabpanel" aria-labelledby="pedidos-tab"
         tabindex="0">
         <div class="row g-4">
-          <!-- Columna Izquierda: Armado del carrito -->
-          <div class="col-md-7">
-            <div class="card">
+          <!-- COLUMNA DERECHA: Contexto del Pedido (Cliente + Carrito + Totales) -->
+          <div class="col-md-5 order-2 order-md-2">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-header bg-white border-bottom-0 pt-3">
+                <h5 class="card-title text-primary"><i class="bi bi-person-circle"></i> Cliente y Pedido</h5>
+              </div>
               <div class="card-body">
-                <h5 class="card-title">Armado del Pedido</h5>
-                <div class="input-group mb-3">
-                  <input type="text" class="form-control" id="input-presupuesto-codigo" placeholder="Cargar Presupuesto (Código)" value="P">
-                  <button class="btn btn-outline-secondary" type="button" id="btn-cargar-presupuesto"><i class="bi bi-download"></i> Cargar</button>
+                <!-- 1. Selección de Cliente -->
+                <div class="mb-3 position-relative">
+                  <label class="form-label small text-muted">Cliente</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control" id="input-buscar-cliente" placeholder="Buscar cliente..." autocomplete="off">
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalNuevoClienteRapido" title="Nuevo Cliente"><i class="bi bi-person-plus-fill"></i></button>
+                  </div>
+                  <div id="lista-resultados-clientes" class="list-group position-absolute w-100 shadow" style="z-index: 1050; max-height: 200px; overflow-y: auto; display: none;"></div>
                 </div>
-                <form id="form-carrito">
-                  <div class="mb-3 position-relative">
-                    <label for="input-buscar-cliente" class="form-label">Buscar Cliente (Nombre, Teléfono...)</label>
-                    <input type="text" class="form-control" id="input-buscar-cliente" placeholder="Escribí para buscar..." autocomplete="off">
-                    <div id="lista-resultados-clientes" class="list-group position-absolute w-100 shadow" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none;"></div>
+
+                <!-- 2. Carga de Presupuesto -->
+                <div class="input-group input-group-sm mb-3">
+                  <input type="text" class="form-control" id="input-presupuesto-codigo" placeholder="Cód. Presupuesto" value="P">
+                  <button class="btn btn-outline-secondary" type="button" id="btn-cargar-presupuesto"><i class="bi bi-download"></i></button>
+                </div>
+
+                <!-- 3. Tabla Carrito -->
+                <div class="table-responsive mb-3 border rounded" style="max-height: 300px; overflow-y: auto;">
+                  <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="table-light sticky-top">
+                      <tr><th style="width: 50px;"></th><th>Libro</th><th style="width: 80px;" class="text-center">Cant.</th><th class="text-end">Precio</th><th style="width: 30px;"></th></tr>
+                    </thead>
+                    <tbody id="tabla-carrito"></tbody>
+                  </table>
+                </div>
+
+                <!-- 4. Totales y Acciones -->
+                <div class="bg-light p-3 rounded">
+                  <div class="d-flex justify-content-between mb-2">
+                    <span class="fw-bold">Total:</span>
+                    <input type="text" id="total-pedido" class="form-control form-control-sm w-50 text-end fw-bold" value="$ 0.00" readonly>
                   </div>
-                  <div class="mb-3 position-relative">
-                    <label for="input-buscar-libro" class="form-label">Buscar Libro (Título, Editorial...)</label>
-                    <input type="text" class="form-control" id="input-buscar-libro" placeholder="Escribí para buscar..." autocomplete="off">
-                    <!-- Contenedor de resultados flotante -->
-                    <div id="lista-resultados-libros" class="list-group position-absolute w-100 shadow" style="z-index: 1000; max-height: 300px; overflow-y: auto; display: none;"></div>
+                  <div class="d-flex justify-content-between mb-2 align-items-center">
+                    <span class="small">Seña:</span>
+                    <input type="number" id="sena-pagada" class="form-control form-control-sm w-50 text-end" placeholder="0.00">
                   </div>
-                </form>
-                <hr>
-                <h6>Libros en el pedido actual</h6>
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th scope="col" style="width: 60px;"></th>
-                      <th scope="col">Libro</th>
-                      <th scope="col">Precio</th>
-                      <th scope="col">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tabla-carrito">
-                    <!-- Filas del carrito se inyectarán aquí -->
-                  </tbody>
-                </table>
+                  <div class="d-flex justify-content-between mb-3">
+                    <span class="small text-muted">Saldo:</span>
+                    <input type="text" id="saldo-pendiente" class="form-control form-control-sm w-50 text-end text-danger" value="$ 0.00" readonly>
+                  </div>
+                  <div class="d-grid gap-2">
+                    <button type="button" id="btn-generar-pedido" class="btn btn-success fw-bold"><i class="bi bi-check-lg"></i> Confirmar Pedido <span class="badge bg-dark ms-2" style="font-size: 0.7em;">F1</span></button>
+                    <button type="button" id="btn-generar-presupuesto" class="btn btn-outline-info"><i class="bi bi-file-text"></i> Presupuestar <span class="badge bg-dark text-white ms-2" style="font-size: 0.7em;">F2</span></button>
+                  </div>
+                </div>
+                <form id="form-carrito" class="d-none"></form> <!-- Hidden form for compatibility -->
+                <form id="form-resumen-cobro" class="d-none"></form> <!-- Hidden form for compatibility -->
               </div>
             </div>
           </div>
 
-          <!-- Columna Derecha: Resumen y Cobro -->
-          <div class="col-md-5">
-            <div class="card">
+          <!-- COLUMNA IZQUIERDA: Buscador Visual de Libros -->
+          <div class="col-md-7 order-1 order-md-1">
+            <div class="card h-100 border-0 shadow-sm">
               <div class="card-body">
-                <h5 class="card-title">Resumen y Cobro</h5>
-                <form id="form-resumen-cobro">
-                  <div class="mb-3">
-                    <label for="total-pedido" class="form-label">Total</label>
-                    <input type="text" id="total-pedido" class="form-control" value="$ 0.00" readonly>
+                <div class="mb-4">
+                  <div class="input-group input-group-lg">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0" id="input-buscar-libro" placeholder="Buscar libro por título, editorial..." autocomplete="off">
                   </div>
-                  <div class="mb-3">
-                    <label for="sena-pagada" class="form-label">Seña Pagada</label>
-                    <input type="number" id="sena-pagada" class="form-control" placeholder="0.00" min="0">
+                </div>
+                
+                <!-- Contenedor de Resultados (Cards) -->
+                <div id="lista-resultados-libros" class="row g-3">
+                  <!-- Aquí se inyectarán las cards -->
+                  <div class="col-12 text-center text-muted py-5">
+                    <i class="bi bi-book fs-1 d-block mb-2"></i>
+                    Empezá a escribir para buscar libros...
                   </div>
-                  <div class="mb-3">
-                    <label for="saldo-pendiente" class="form-label">Saldo Pendiente</label>
-                    <input type="text" id="saldo-pendiente" class="form-control" value="$ 0.00" readonly>
-                  </div>
-                  <div class="d-grid">
-                    <button type="submit" id="btn-generar-pedido" class="btn btn-success btn-lg">Generar Pedido</button>
-                    <button type="button" id="btn-generar-presupuesto" class="btn btn-info btn-lg text-white">Generar Presupuesto</button>
-                  </div>
-                </form>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <!-- Listas de Autocompletado (Invisibles) -->
+        <datalist id="datalist-editoriales"></datalist>
+        <datalist id="datalist-colegios"></datalist>
+        <datalist id="datalist-titulos-libros"></datalist>
       </div>
 
       <!-- Pestaña 2: ABM Libros -->
@@ -134,9 +194,9 @@
             <h5 class="card-title">Cargar Nuevo Libro</h5>
             <form id="form-nuevo-libro">
               <div class="row">
-                <div class="col-md-6 mb-3"><input type="text" class="form-control" id="libro-titulo" placeholder="Título" required></div>
+                <div class="col-md-6 mb-3"><input type="text" class="form-control" id="libro-titulo" placeholder="Título" list="datalist-titulos-libros" autocomplete="off" required></div>
                 <div class="col-md-6 mb-3"><input type="number" class="form-control" id="libro-paginas" placeholder="Cantidad de Páginas"></div>
-                <div class="col-md-6 mb-3"><input type="text" class="form-control" id="libro-editorial" placeholder="Editorial"></div>
+                <div class="col-md-6 mb-3"><input type="text" class="form-control" id="libro-editorial" placeholder="Editorial" list="datalist-editoriales" autocomplete="off"></div>
                 <div class="col-md-6 mb-3"><input type="number" class="form-control" id="libro-precio" placeholder="Precio" step="0.01" required></div>
                 <div class="col-12 mb-3"><label for="libro-imagen" class="form-label">Imagen de Portada</label><input type="file" class="form-control" id="libro-imagen" accept="image/*"></div>
               </div>
@@ -159,7 +219,7 @@
               <div class="row">
                 <div class="col-md-6 mb-3"><input type="text" class="form-control" id="cliente-nombre" placeholder="Nombre Completo" required></div>
                 <div class="col-md-6 mb-3"><input type="tel" class="form-control" id="cliente-telefono" placeholder="Teléfono"></div>
-                <div class="col-md-12 mb-3"><input type="text" class="form-control" id="cliente-colegio" placeholder="Colegio / Institución"></div>
+                <div class="col-md-12 mb-3"><input type="text" class="form-control" id="cliente-colegio" placeholder="Colegio / Institución" list="datalist-colegios" autocomplete="off"></div>
               </div>
               <button type="submit" id="btn-guardar-cliente" class="btn btn-primary">Guardar Cliente</button>
             </form>
@@ -270,7 +330,7 @@
             <input type="hidden" id="edit-libro-id">
             <div class="mb-3"><label class="form-label">Título</label><input type="text" class="form-control" id="edit-libro-titulo"></div>
             <div class="mb-3"><label class="form-label">Páginas</label><input type="number" class="form-control" id="edit-libro-paginas"></div>
-            <div class="mb-3"><label class="form-label">Editorial</label><input type="text" class="form-control" id="edit-libro-editorial"></div>
+            <div class="mb-3"><label class="form-label">Editorial</label><input type="text" class="form-control" id="edit-libro-editorial" list="datalist-editoriales" autocomplete="off"></div>
             <div class="mb-3"><label class="form-label">Precio</label><input type="number" class="form-control" id="edit-libro-precio" step="0.01"></div>
           </form>
         </div>
@@ -292,7 +352,7 @@
             <input type="hidden" id="edit-cliente-id">
             <div class="mb-3"><label class="form-label">Nombre</label><input type="text" class="form-control" id="edit-cliente-nombre"></div>
             <div class="mb-3"><label class="form-label">Teléfono</label><input type="tel" class="form-control" id="edit-cliente-telefono"></div>
-            <div class="mb-3"><label class="form-label">Colegio</label><input type="text" class="form-control" id="edit-cliente-colegio"></div>
+            <div class="mb-3"><label class="form-label">Colegio</label><input type="text" class="form-control" id="edit-cliente-colegio" list="datalist-colegios" autocomplete="off"></div>
           </form>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary" id="btn-guardar-edicion-cliente">Guardar Cambios</button></div>
@@ -319,10 +379,51 @@
     </div>
   </div>
 
+  <!-- Modal Nuevo Cliente Rápido -->
+  <div class="modal fade" id="modalNuevoClienteRapido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fs-6">Nuevo Cliente</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="form-nuevo-cliente-rapido">
+            <div class="mb-2"><input type="text" class="form-control" id="rapido-cliente-nombre" placeholder="Nombre Completo" required></div>
+            <div class="mb-2"><input type="tel" class="form-control" id="rapido-cliente-telefono" placeholder="Teléfono"></div>
+            <div class="mb-3"><input type="text" class="form-control" id="rapido-cliente-colegio" placeholder="Colegio" list="datalist-colegios" autocomplete="off"></div>
+            <div class="d-grid"><button type="submit" class="btn btn-primary btn-sm">Guardar y Seleccionar</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Detalle y Estadísticas de Libro -->
+  <div class="modal fade" id="modalLibroDetalle" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="detalle-libro-titulo">Título del Libro</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="detalle-libro-contenido">
+            <!-- Aquí se inyectará la info y los gráficos vía JS -->
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap JS Bundle (Popper.js included) via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
     crossorigin="anonymous"></script>
+
+  <!-- SweetAlert2 (Alertas lindas) -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <!-- Tu script de Firebase y lógica del panel -->
   <script type="module" src="admin.js"></script>

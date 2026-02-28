@@ -24,6 +24,77 @@ const storage = getStorage(app);
 const formNuevoLibro = document.getElementById('form-nuevo-libro');
 const listaLibrosDiv = document.getElementById('lista-libros');
 
+// --- UTILIDADES Y REFERENCIAS (Colegios/Editoriales) ---
+
+let colegiosEnMemoria = [];
+let editorialesEnMemoria = [];
+
+/**
+ * Convierte un texto a Title Case (Primera Letra Mayúscula).
+ * Ej: "juan perez" -> "Juan Perez"
+ */
+const capitalizarTexto = (texto) => {
+  if (!texto) return '';
+  return texto.toLowerCase().replace(/(?:^|\s|["'([{])+\S/g, match => match.toUpperCase());
+};
+
+/**
+ * Carga las listas de referencia para los datalists.
+ */
+const cargarListasReferencia = async () => {
+  try {
+    // Cargar Colegios
+    const colSnap = await getDocs(collection(db, "colegios"));
+    colegiosEnMemoria = [];
+    const datalistColegios = document.getElementById('datalist-colegios');
+    datalistColegios.innerHTML = '';
+    colSnap.forEach(doc => {
+      const nombre = doc.data().nombre;
+      colegiosEnMemoria.push(nombre);
+      const option = document.createElement('option');
+      option.value = nombre;
+      datalistColegios.appendChild(option);
+    });
+
+    // Cargar Editoriales
+    const edSnap = await getDocs(collection(db, "editoriales"));
+    editorialesEnMemoria = [];
+    const datalistEditoriales = document.getElementById('datalist-editoriales');
+    datalistEditoriales.innerHTML = '';
+    edSnap.forEach(doc => {
+      const nombre = doc.data().nombre;
+      editorialesEnMemoria.push(nombre);
+      const option = document.createElement('option');
+      option.value = nombre;
+      datalistEditoriales.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Error cargando referencias:", error);
+  }
+};
+
+const guardarReferenciaSiNoExiste = async (coleccion, listaMemoria, valor) => {
+  if (!valor) return;
+  // Verificar si ya existe (ignorando mayúsculas/minúsculas)
+  const existe = listaMemoria.some(item => item.toLowerCase() === valor.toLowerCase());
+  if (!existe) {
+    await addDoc(collection(db, coleccion), { nombre: valor });
+    await cargarListasReferencia(); // Recargar listas
+  }
+};
+
+const actualizarDatalistTitulos = () => {
+  const datalist = document.getElementById('datalist-titulos-libros');
+  if (!datalist) return;
+  datalist.innerHTML = '';
+  const titulos = [...new Set(librosEnMemoria.map(l => l.titulo))].sort();
+  titulos.forEach(titulo => {
+    const option = document.createElement('option');
+    option.value = titulo;
+    datalist.appendChild(option);
+  });
+};
+
 /**
  * Sube un archivo a Firebase Storage y devuelve la URL de descarga.
  * @param {File} file - El archivo a subir.
@@ -88,21 +159,26 @@ formNuevoLibro.addEventListener('submit', async (e) => {
     const imagenFile = document.getElementById('libro-imagen').files[0];
     const imageUrl = await subirImagen(imagenFile);
 
+    const editorial = capitalizarTexto(document.getElementById('libro-editorial').value);
+
     const libroData = {
-      titulo: document.getElementById('libro-titulo').value,
+      titulo: capitalizarTexto(document.getElementById('libro-titulo').value),
       paginas: Number(document.getElementById('libro-paginas').value) || 0,
-      editorial: document.getElementById('libro-editorial').value,
+      editorial: editorial,
       precio: parseFloat(document.getElementById('libro-precio').value),
-      imageUrl: imageUrl
+      imageUrl: imageUrl,
+      fecha_creacion: new Date() // Guardamos fecha para ordenar por "Nuevos"
     };
 
+    await guardarReferenciaSiNoExiste("editoriales", editorialesEnMemoria, editorial);
     await addDoc(collection(db, "libros"), libroData);
-    alert('¡Libro guardado con éxito!');
+    Swal.fire('¡Guardado!', 'El libro se cargó correctamente.', 'success');
     formNuevoLibro.reset();
     await cargarLibros(); // Actualizar la lista de libros
+    await cargarLibrosEnMemoria(); // Actualizar memoria y autocompletado (Esperamos a que termine)
   } catch (error) {
     console.error("Error al guardar el libro: ", error);
-    alert('Ocurrió un error al guardar el libro.');
+    Swal.fire('Error', 'No se pudo guardar el libro.', 'error');
   } finally {
     submitButton.disabled = false;
     submitButton.innerHTML = 'Guardar Libro';
@@ -115,14 +191,27 @@ listaLibrosDiv.addEventListener('click', async (e) => {
   // Eliminar Libro
   if (e.target.closest('.btn-eliminar-libro')) {
     const id = e.target.closest('.btn-eliminar-libro').dataset.id;
-    if (confirm('¿Estás seguro de que querés eliminar este libro?')) {
+    
+    const result = await Swal.fire({
+      title: '¿Eliminar libro?',
+      text: "No podrás revertir esto.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
       try {
         await deleteDoc(doc(db, "libros", id));
         cargarLibros();
         cargarLibrosEnMemoria();
+        Swal.fire('Eliminado', 'El libro ha sido eliminado.', 'success');
       } catch (error) {
         console.error("Error al eliminar libro:", error);
-        alert("Error al eliminar el libro.");
+        Swal.fire('Error', 'No se pudo eliminar el libro.', 'error');
       }
     }
   }
@@ -146,17 +235,20 @@ listaLibrosDiv.addEventListener('click', async (e) => {
 // Guardar cambios del libro editado
 document.getElementById('btn-guardar-edicion-libro').addEventListener('click', async () => {
   const id = document.getElementById('edit-libro-id').value;
+  const editorial = capitalizarTexto(document.getElementById('edit-libro-editorial').value);
+  
   const datosActualizados = {
-    titulo: document.getElementById('edit-libro-titulo').value,
+    titulo: capitalizarTexto(document.getElementById('edit-libro-titulo').value),
     paginas: Number(document.getElementById('edit-libro-paginas').value),
-    editorial: document.getElementById('edit-libro-editorial').value,
+    editorial: editorial,
     precio: parseFloat(document.getElementById('edit-libro-precio').value)
   };
 
+  await guardarReferenciaSiNoExiste("editoriales", editorialesEnMemoria, editorial);
   await updateDoc(doc(db, "libros", id), datosActualizados);
-  alert("Libro actualizado correctamente");
+  Swal.fire('Actualizado', 'Los datos del libro se guardaron.', 'success');
   cargarLibros();
-  cargarLibrosEnMemoria();
+  await cargarLibrosEnMemoria(); // Actualizar memoria para reflejar cambios en el buscador
   bootstrap.Modal.getInstance(document.getElementById('modalEditarLibro')).hide();
 });
 
@@ -167,6 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarClientesEnMemoria();
   cargarLibrosEnMemoria();
   cargarPedidos(); // Cargar pedidos al inicio
+  cargarListasReferencia(); // Cargar autocompletado
+  inputSena.value = ""; // Limpiar seña al recargar
+  actualizarTotales();
 
   // Configuración del modal de imágenes
   const modalImagenElement = document.getElementById('modalImagen');
@@ -191,6 +286,7 @@ let selectedIndexClientes = -1;
 let librosEnMemoria = []; // Array para búsqueda rápida
 let resultadosBusqueda = []; // Array temporal de resultados filtrados
 let selectedIndex = -1; // Para navegación con teclado
+let pedidosEnMemoria = []; // Historial de pedidos (Global)
 
 const inputBuscarCliente = document.getElementById('input-buscar-cliente');
 const listaResultadosClientes = document.getElementById('lista-resultados-clientes');
@@ -232,13 +328,26 @@ const cargarLibrosEnMemoria = async () => {
         ...doc.data()
       });
     });
+    mostrarLibrosSugeridos(); // Actualizar sugerencias si ya cargaron los pedidos
+    actualizarDatalistTitulos(); // Actualizar autocompletado de títulos
   } catch (error) {
     console.error("Error al cargar libros en memoria:", error);
   }
 };
 
 const actualizarTotales = () => {
-  const sena = parseFloat(inputSena.value) || 0;
+  // Calcular total sumando (precio * cantidad) de cada item
+  totalPedido = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+  
+  let sena = parseFloat(inputSena.value) || 0;
+
+  // Validación visual: La seña no puede ser mayor al total ni negativa
+  if (sena > totalPedido || sena < 0) {
+    inputSena.classList.add('is-invalid');
+  } else {
+    inputSena.classList.remove('is-invalid');
+  }
+
   const saldo = totalPedido - sena;
   const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
   
@@ -253,21 +362,48 @@ const renderizarCarrito = () => {
   carrito.forEach((item, index) => {
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td><img src="${item.imageUrl || 'https://via.placeholder.com/50x75'}" alt="Portada" width="40" class="img-thumbnail" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalImagen" data-img-url="${item.imageUrl || 'https://via.placeholder.com/50x75'}"></td>
+      <td><img src="${item.imageUrl || 'https://via.placeholder.com/50x75'}" alt="Img" width="30" height="45" class="rounded" style="object-fit: cover;"></td>
       <td>
-        ${item.titulo}
-        ${item.editorial ? `<br><small class="text-muted">${item.editorial}</small>` : ''}
+        <div class="text-truncate" style="max-width: 150px;" title="${item.titulo}">${item.titulo}</div>
+        <small class="text-muted" style="font-size: 0.75rem;">${item.editorial || ''}</small>
       </td>
-      <td>${formatter.format(item.precio)}</td>
-      <td><button class="btn btn-danger btn-sm btn-eliminar-item" data-index="${index}"><i class="bi bi-trash"></i></button></td>
+      <td class="text-center">
+        <div class="input-group input-group-sm" style="width: 80px; margin: 0 auto;">
+          <button class="btn btn-outline-secondary px-1 btn-restar-cantidad" data-index="${index}" type="button">-</button>
+          <input type="text" class="form-control text-center px-0 input-cantidad" value="${item.cantidad}" readonly style="font-size: 0.8rem;">
+          <button class="btn btn-outline-secondary px-1 btn-sumar-cantidad" data-index="${index}" type="button">+</button>
+        </div>
+      </td>
+      <td class="text-end small">${formatter.format(item.precio * item.cantidad)}</td>
+      <td><button class="btn btn-link text-danger btn-sm p-0 btn-eliminar-item" data-index="${index}"><i class="bi bi-x-circle-fill"></i></button></td>
     `;
     tablaCarrito.appendChild(row);
+  });
+
+  // Eventos para botones de cantidad y eliminar
+  document.querySelectorAll('.btn-restar-cantidad').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.dataset.index);
+      if (carrito[index].cantidad > 1) {
+        carrito[index].cantidad--;
+        renderizarCarrito();
+        actualizarTotales();
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-sumar-cantidad').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.dataset.index);
+      carrito[index].cantidad++;
+      renderizarCarrito();
+      actualizarTotales();
+    });
   });
 
   document.querySelectorAll('.btn-eliminar-item').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const index = parseInt(e.target.closest('button').dataset.index);
-      totalPedido -= carrito[index].precio;
       carrito.splice(index, 1);
       renderizarCarrito();
       actualizarTotales();
@@ -277,15 +413,33 @@ const renderizarCarrito = () => {
 
 // Función auxiliar para agregar al carrito
 const agregarAlCarrito = (libro) => {
-  carrito.push({ id: libro.id, titulo: libro.titulo, editorial: libro.editorial, precio: libro.precio, imageUrl: libro.imageUrl });
-  totalPedido += libro.precio;
+  // Buscar si el libro ya existe en el carrito
+  const indexExistente = carrito.findIndex(item => item.id === libro.id);
+
+  if (indexExistente !== -1) {
+    carrito[indexExistente].cantidad++;
+  } else {
+    carrito.push({ id: libro.id, titulo: libro.titulo, editorial: libro.editorial, precio: libro.precio, imageUrl: libro.imageUrl, cantidad: 1 });
+  }
+  
   renderizarCarrito();
   actualizarTotales();
   
-  // Limpiar buscador y mantener el foco para seguir agregando
-  inputBuscarLibro.value = '';
-  listaResultados.style.display = 'none';
-  selectedIndex = -1;
+  // Feedback visual tipo Toast (no intrusivo) para que la lista no desaparezca
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 1500,
+    timerProgressBar: false
+  });
+  
+  Toast.fire({
+    icon: 'success',
+    title: 'Agregado al pedido'
+  });
+
+  // Mantener el foco para seguir buscando o agregando
   inputBuscarLibro.focus();
 };
 
@@ -378,41 +532,183 @@ document.addEventListener('click', (e) => {
 
 // --- LÓGICA DEL BUSCADOR (Tokenización y Teclado) ---
 
-const renderizarResultadosBusqueda = (libros) => {
+const renderizarResultadosBusqueda = (libros, titulo = '') => {
   listaResultados.innerHTML = '';
+
+  if (titulo) {
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'col-12 mb-2';
+    titleDiv.innerHTML = `<h6 class="text-muted border-bottom pb-2 small text-uppercase fw-bold"><i class="bi bi-graph-up-arrow text-primary"></i> ${titulo}</h6>`;
+    listaResultados.appendChild(titleDiv);
+  }
+
   if (libros.length === 0) {
-    listaResultados.style.display = 'none';
+    listaResultados.innerHTML = '<div class="col-12 text-center text-muted py-4">No se encontraron libros.</div>';
     return;
   }
 
-  const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+  // Limitamos a 10 resultados para no saturar la vista
+  const librosLimitados = libros.slice(0, 10);
+  const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-  libros.forEach((libro, index) => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = `list-group-item list-group-item-action ${index === selectedIndex ? 'active' : ''}`;
+  librosLimitados.forEach((libro, index) => {
+    const col = document.createElement('div');
+    col.className = 'col-md-6'; // 2 columnas de cards
+    
+    const activeClass = index === selectedIndex ? 'border-primary shadow' : 'border-light';
+    
+    const item = document.createElement('div');
+    item.className = `card h-100 search-card-book ${activeClass}`;
+    item.style.transition = 'transform 0.1s';
+    
     item.innerHTML = `
-      <div class="d-flex w-100 justify-content-between">
-        <h6 class="mb-1">${libro.titulo || 'Sin Título'}</h6>
-        <small>${formatter.format(libro.precio)}</small>
+      <div class="card-body p-2 d-flex flex-column h-100">
+        <h6 class="card-title mb-2 text-center text-dark fw-bold" style="font-size: 0.95rem; line-height: 1.2;">${libro.titulo || 'Sin Título'}</h6>
+        <div class="d-flex align-items-center justify-content-center mt-auto">
+          <div class="position-relative">
+            <img src="${libro.imageUrl || 'https://via.placeholder.com/50x75'}" class="rounded me-3 shadow-sm" alt="Portada" style="height: 80px; width: 55px; object-fit: cover; cursor: zoom-in;" data-bs-toggle="modal" data-bs-target="#modalImagen" data-img-url="${libro.imageUrl || 'https://via.placeholder.com/50x75'}" title="Ver portada grande">
+          </div>
+          <div class="text-start">
+            <p class="card-text mb-1 lh-1"><small class="text-muted">${libro.editorial || 'Sin Ed.'}<br>${libro.paginas || '?'} pág.</small></p>
+            <p class="card-text text-primary fw-bold fs-5 mb-0">${formatter.format(libro.precio)}</p>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-success btn-sm flex-grow-1 fw-bold btn-agregar-carrito"><i class="bi bi-cart-plus"></i> Agregar</button>
+          <button class="btn btn-outline-secondary btn-sm btn-ver-info"><i class="bi bi-info-circle"></i></button>
+        </div>
       </div>
-      <small class="text-muted">${libro.editorial || ''}</small>
     `;
     
-    // Click para agregar
-    item.addEventListener('click', () => agregarAlCarrito(libro));
-    listaResultados.appendChild(item);
+    // Efecto hover simple
+    item.onmouseover = () => item.classList.add('shadow-sm');
+    item.onmouseout = () => { if(index !== selectedIndex) item.classList.remove('shadow-sm'); };
+
+    // Eventos de botones
+    item.querySelector('.btn-agregar-carrito').addEventListener('click', () => agregarAlCarrito(libro));
+    item.querySelector('.btn-ver-info').addEventListener('click', () => verDetalleLibro(libro));
+    
+    col.appendChild(item);
+    listaResultados.appendChild(col);
+  });
+};
+
+// Función para ver detalles y estadísticas del libro
+const verDetalleLibro = (libro) => {
+  const modalTitle = document.getElementById('detalle-libro-titulo');
+  const modalContent = document.getElementById('detalle-libro-contenido');
+  const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 });
+
+  modalTitle.textContent = libro.titulo;
+
+  // Calcular estadísticas basadas en pedidosEnMemoria
+  let totalPedidos = 0;
+  let estados = { 'En cola de impresión': 0, 'Imprimiendo / Armando': 0, 'Encuadernando': 0, 'Terminado': 0, 'Entregado': 0 };
+
+  pedidosEnMemoria.forEach(pedido => {
+    // Buscamos si este libro está en el pedido
+    const itemsLibro = pedido.items.filter(item => item.id === libro.id);
+    itemsLibro.forEach(item => {
+      totalPedidos++; // Contamos cada unidad pedida
+      // Usamos el estado del item si existe, sino el del pedido (para compatibilidad)
+      const estadoItem = item.estado || pedido.estado_general; 
+      if (estados[estadoItem] !== undefined) estados[estadoItem]++;
+    });
   });
 
-  listaResultados.style.display = 'block';
+  // Generar HTML del gráfico (Barras de progreso)
+  const generarBarra = (label, valor, color) => {
+    if (valor === 0) return '';
+    const porcentaje = Math.round((valor / totalPedidos) * 100);
+    return `
+      <div class="mb-2">
+        <div class="d-flex justify-content-between small mb-1">
+          <span>${label}</span>
+          <span>${valor} (${porcentaje}%)</span>
+        </div>
+        <div class="progress" style="height: 8px;">
+          <div class="progress-bar bg-${color}" role="progressbar" style="width: ${porcentaje}%"></div>
+        </div>
+      </div>
+    `;
+  };
+
+  modalContent.innerHTML = `
+    <div class="text-center mb-3">
+      <img src="${libro.imageUrl || 'https://via.placeholder.com/150'}" class="img-thumbnail shadow-sm" style="max-height: 200px;">
+    </div>
+    <ul class="list-group list-group-flush mb-3">
+      <li class="list-group-item d-flex justify-content-between"><span>Precio:</span> <strong>${formatter.format(libro.precio)}</strong></li>
+      <li class="list-group-item d-flex justify-content-between"><span>Editorial:</span> <span>${libro.editorial || '-'}</span></li>
+      <li class="list-group-item d-flex justify-content-between"><span>Páginas:</span> <span>${libro.paginas || '-'}</span></li>
+    </ul>
+    
+    <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-bar-chart-line"></i> Estadísticas Históricas</h6>
+    <div class="alert alert-light border text-center">
+      <h2 class="mb-0">${totalPedidos}</h2>
+      <small class="text-muted">Unidades pedidas en total</small>
+    </div>
+    
+    ${generarBarra('En cola / Pendiente', estados['En cola de impresión'], 'warning')}
+    ${generarBarra('En Producción (Imp/Enc)', estados['Imprimiendo / Armando'] + estados['Encuadernando'], 'primary')}
+    ${generarBarra('Terminado / Entregado', estados['Terminado'] + estados['Entregado'], 'success')}
+  `;
+
+  const modal = new bootstrap.Modal(document.getElementById('modalLibroDetalle'));
+  modal.show();
+};
+
+// Función para mostrar libros sugeridos (Más vendidos últimos 30 días)
+const mostrarLibrosSugeridos = () => {
+  if (librosEnMemoria.length === 0) return;
+
+  let sugeridos = [];
+  
+  if (pedidosEnMemoria.length > 0) {
+    // Calcular Top 10 de los últimos 30 días
+    const hace30Dias = new Date();
+    hace30Dias.setDate(hace30Dias.getDate() - 30);
+    const conteo = {};
+    
+    pedidosEnMemoria.forEach(p => {
+       const fecha = p.fecha_creacion ? new Date(p.fecha_creacion.seconds * 1000) : new Date();
+       if (fecha >= hace30Dias) {
+         p.items.forEach(item => {
+           if(item.id) conteo[item.id] = (conteo[item.id] || 0) + 1;
+         });
+       }
+    });
+    
+    // Ordenar libros por popularidad y luego por fecha (Nuevos primero)
+    sugeridos = [...librosEnMemoria].sort((a, b) => {
+      const ventasA = conteo[a.id] || 0;
+      const ventasB = conteo[b.id] || 0;
+      
+      if (ventasA !== ventasB) return ventasB - ventasA; // Primero por ventas
+      
+      // Si tienen mismas ventas, el más nuevo primero (Manejo de Timestamp de Firebase o Date nativo)
+      const fechaA = a.fecha_creacion ? (a.fecha_creacion.seconds || new Date(a.fecha_creacion).getTime()) : 0;
+      const fechaB = b.fecha_creacion ? (b.fecha_creacion.seconds || new Date(b.fecha_creacion).getTime()) : 0;
+      return fechaB - fechaA;
+    });
+  } else {
+    // Si no hay pedidos, mostrar los más nuevos primero
+    sugeridos = [...librosEnMemoria].sort((a, b) => {
+      const fechaA = a.fecha_creacion ? (a.fecha_creacion.seconds || new Date(a.fecha_creacion).getTime()) : 0;
+      const fechaB = b.fecha_creacion ? (b.fecha_creacion.seconds || new Date(b.fecha_creacion).getTime()) : 0;
+      return fechaB - fechaA;
+    });
+  }
+  
+  renderizarResultadosBusqueda(sugeridos.slice(0, 10), 'Sugeridos / Más Vendidos');
 };
 
 inputBuscarLibro.addEventListener('input', (e) => {
   const userInput = e.target.value.toLowerCase();
   selectedIndex = -1; // Resetear selección al escribir
 
-  if (userInput.length < 2) {
-    listaResultados.style.display = 'none';
+  if (userInput.length === 0) {
+    mostrarLibrosSugeridos();
     return;
   }
 
@@ -435,7 +731,7 @@ inputBuscarLibro.addEventListener('input', (e) => {
 
 // Manejo del teclado (Flechas y Enter)
 inputBuscarLibro.addEventListener('keydown', (e) => {
-  const items = listaResultados.querySelectorAll('.list-group-item');
+  // const items = listaResultados.querySelectorAll('.search-card-book'); // No se usa directamente pero sirve de referencia
   
   if (e.key === 'ArrowDown') {
     e.preventDefault();
@@ -458,14 +754,8 @@ inputBuscarLibro.addEventListener('keydown', (e) => {
       agregarAlCarrito(resultadosBusqueda[0]);
     }
   } else if (e.key === 'Escape') {
-    listaResultados.style.display = 'none';
-  }
-});
-
-// Cerrar lista si clickeo afuera
-document.addEventListener('click', (e) => {
-  if (!inputBuscarLibro.contains(e.target) && !listaResultados.contains(e.target)) {
-    listaResultados.style.display = 'none';
+    inputBuscarLibro.value = '';
+    mostrarLibrosSugeridos();
   }
 });
 
@@ -481,19 +771,41 @@ btnGenerarPedido.addEventListener('click', async (e) => {
   e.preventDefault();
   const idCliente = clienteSeleccionado ? clienteSeleccionado.id : null;
 
-  if (!idCliente || carrito.length === 0) {
-    alert('Por favor, seleccioná un cliente y agregá al menos un libro al pedido.');
+  if (carrito.length === 0) {
+    Swal.fire('Carrito vacío', 'Por favor, agregá al menos un libro al pedido.', 'warning');
+    return;
+  }
+
+  if (!idCliente) {
+    Swal.fire('Falta Cliente', 'Para confirmar un pedido es necesario seleccionar un cliente.', 'warning');
     return;
   }
 
   const codigo = generarCodigo();
   const sena = parseFloat(inputSena.value) || 0;
+
+  if (sena > totalPedido || sena < 0) {
+    Swal.fire('Error en la seña', 'El monto de la seña no puede ser mayor al total del pedido.', 'error');
+    return;
+  }
+
   const saldo = totalPedido - sena;
+
+  // "Aplanar" el carrito: Convertir items agrupados (cantidad > 1) en items individuales para la base de datos
+  // Esto es necesario para que la Cola de Producción pueda marcar cada libro individualmente como terminado.
+  const itemsExpandidos = carrito.flatMap(item => {
+    const itemsIndividuales = [];
+    for (let i = 0; i < item.cantidad; i++) {
+      const { cantidad, ...itemSinCantidad } = item; // Creamos copia sin la propiedad cantidad
+      itemsIndividuales.push(itemSinCantidad);
+    }
+    return itemsIndividuales;
+  });
 
   const nuevoPedido = {
     codigo_seguimiento: codigo,
     id_cliente: idCliente,
-    items: carrito,
+    items: itemsExpandidos,
     total: totalPedido,
     sena_pagada: sena,
     saldo_pendiente: saldo,
@@ -513,7 +825,12 @@ btnGenerarPedido.addEventListener('click', async (e) => {
     mensajeCliente += `Tu pedido fue generado con éxito. 🚀\n\n`;
     mensajeCliente += `🔖 *Código de Seguimiento:* *${codigo}*\n`;
     mensajeCliente += `🔗 *Seguí el estado acá:* ${urlSeguimiento}\n\n`;
-    mensajeCliente += `💰 *Total:* ${formatter.format(totalPedido)}\n`;
+    mensajeCliente += `📚 *Detalle:*\n`;
+    carrito.forEach(item => {
+      mensajeCliente += `   • ${item.titulo} (x${item.cantidad})\n`;
+    });
+    mensajeCliente += `\n`;
+    mensajeCliente += `� *Total:* ${formatter.format(totalPedido)}\n`;
     mensajeCliente += `✅ *Seña:* ${formatter.format(sena)}\n`;
     mensajeCliente += `❗ *Saldo:* ${formatter.format(saldo)}\n\n`;
     mensajeCliente += `Te avisamos cuando esté listo para retirar!\n`;
@@ -521,27 +838,30 @@ btnGenerarPedido.addEventListener('click', async (e) => {
 
     // Copiar al portapapeles y avisar
     navigator.clipboard.writeText(mensajeCliente);
-    alert(`Pedido creado con éxito.\nEl código de seguimiento es: ${codigo}\n\n✅ ¡Mensaje para el cliente copiado al portapapeles!`);
+    Swal.fire({
+      title: '¡Pedido Creado!',
+      html: `Código: <strong>${codigo}</strong><br><br>El mensaje para el cliente fue copiado al portapapeles.`,
+      icon: 'success'
+    });
     
     // Resetear estado
     carrito = [];
     totalPedido = 0;
+    inputSena.value = ""; // Limpiar explícitamente el campo de seña
     renderizarCarrito();
     actualizarTotales();
-    document.getElementById('form-carrito').reset();
-    document.getElementById('form-resumen-cobro').reset();
     clienteSeleccionado = null;
     inputBuscarCliente.value = "";
     inputBuscarLibro.value = "";
   } catch (error) {
     console.error("Error al generar pedido:", error);
-    alert("Hubo un error al generar el pedido.");
+    Swal.fire('Error', 'Hubo un problema al generar el pedido.', 'error');
   }
 });
 
 btnGenerarPresupuesto.addEventListener('click', async () => {
   if (carrito.length === 0) {
-    alert('Por favor, agregá al menos un libro al carrito para presupuestar.');
+    Swal.fire('Carrito vacío', 'Agregá libros antes de presupuestar.', 'warning');
     return;
   }
 
@@ -549,11 +869,21 @@ btnGenerarPresupuesto.addEventListener('click', async () => {
   const senaSugerida = totalPedido / 2;
   const codigoPresupuesto = generarCodigo('P'); // Generamos un código único para el presupuesto (Ej: P12345)
 
+  // Expandir items para guardar en BD (mismo formato que pedidos)
+  const itemsExpandidos = carrito.flatMap(item => {
+    const itemsIndividuales = [];
+    for (let i = 0; i < item.cantidad; i++) {
+      const { cantidad, ...itemSinCantidad } = item;
+      itemsIndividuales.push(itemSinCantidad);
+    }
+    return itemsIndividuales;
+  });
+
   // Guardar presupuesto en Firestore
   try {
     const presupuestoData = {
       codigo: codigoPresupuesto,
-      items: carrito,
+      items: itemsExpandidos,
       total: totalPedido,
       cliente: clienteSeleccionado ? { id: clienteSeleccionado.id, nombre: clienteSeleccionado.nombre, telefono: clienteSeleccionado.telefono } : null,
       fecha: new Date()
@@ -561,13 +891,14 @@ btnGenerarPresupuesto.addEventListener('click', async () => {
     await addDoc(collection(db, "presupuestos"), presupuestoData);
   } catch (error) {
     console.error("Error al guardar presupuesto:", error);
-    alert("Error al guardar el presupuesto en el sistema (aunque se copiará al portapapeles).");
+    // No bloqueamos el flujo si falla el guardado, solo avisamos en consola
   }
 
   let mensaje = `Hola! 👋 Te paso el presupuesto solicitado (Ref: ${codigoPresupuesto}):\n\n`;
 
   carrito.forEach(item => {
-    mensaje += `📚 *${item.titulo}*\n   _${item.editorial || 'Ed. Varios'}_ — ${formatter.format(item.precio)}\n`;
+    const totalItem = item.precio * item.cantidad;
+    mensaje += `📚 *${item.titulo}* (x${item.cantidad})\n   _${item.editorial || 'Ed. Varios'}_ — ${formatter.format(totalItem)}\n`;
   });
 
   mensaje += `\n✅ *Impresión a color y anillado incluido.*\n`;
@@ -582,7 +913,23 @@ btnGenerarPresupuesto.addEventListener('click', async () => {
 
   // Copiar al portapapeles y avisar
   navigator.clipboard.writeText(mensaje);
-  alert(`✅ ¡Presupuesto #${codigoPresupuesto} guardado y copiado!\n\nYa podés pegarlo en WhatsApp.`);
+  Swal.fire({
+    title: '¡Presupuesto Listo!',
+    html: `Referencia: <strong>${codigoPresupuesto}</strong><br>Copiado al portapapeles para enviar por WhatsApp.`,
+    icon: 'success'
+  });
+});
+
+// Atajos de teclado (F1 y F2)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'F1') {
+    e.preventDefault(); // Evitar ayuda del navegador
+    if (btnGenerarPedido && !btnGenerarPedido.disabled) btnGenerarPedido.click();
+  }
+  if (e.key === 'F2') {
+    e.preventDefault();
+    if (btnGenerarPresupuesto && !btnGenerarPresupuesto.disabled) btnGenerarPresupuesto.click();
+  }
 });
 
 // --- LÓGICA PARA CARGAR PRESUPUESTO ---
@@ -590,7 +937,7 @@ btnGenerarPresupuesto.addEventListener('click', async () => {
 btnCargarPresupuesto.addEventListener('click', async () => {
   const codigo = inputPresupuestoCodigo.value.trim().toUpperCase();
   if (!codigo) {
-    alert("Por favor, ingresá un código de presupuesto.");
+    Swal.fire('Atención', 'Ingresá un código de presupuesto.', 'warning');
     return;
   }
 
@@ -602,13 +949,17 @@ btnCargarPresupuesto.addEventListener('click', async () => {
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      alert("❌ No se encontró ningún presupuesto con ese código.");
+      Swal.fire('No encontrado', 'No existe un presupuesto con ese código.', 'error');
     } else {
       const presupuesto = querySnapshot.docs[0].data();
       
       // Cargar datos al carrito
-      carrito = presupuesto.items || [];
-      totalPedido = presupuesto.total || 0;
+      // Como vienen desagrupados de la BD, usamos agregarAlCarrito para reagruparlos visualmente
+      carrito = [];
+      const itemsBD = presupuesto.items || [];
+      itemsBD.forEach(item => {
+        agregarAlCarrito(item); // Esto se encarga de agrupar y sumar totales
+      });
       
       // Cargar cliente si existe en el presupuesto
       if (presupuesto.cliente) {
@@ -617,12 +968,12 @@ btnCargarPresupuesto.addEventListener('click', async () => {
 
       renderizarCarrito();
       actualizarTotales();
-      alert("✅ Presupuesto cargado correctamente.");
+      Swal.fire('Cargado', 'Presupuesto recuperado con éxito.', 'success');
       inputPresupuestoCodigo.value = "P"; // Limpiar input (manteniendo el prefijo)
     }
   } catch (error) {
     console.error("Error al cargar presupuesto:", error);
-    alert("Ocurrió un error al buscar el presupuesto.");
+    Swal.fire('Error', 'Ocurrió un error al buscar.', 'error');
   } finally {
     btnCargarPresupuesto.disabled = false;
     btnCargarPresupuesto.innerHTML = '<i class="bi bi-download"></i> Cargar';
@@ -671,19 +1022,45 @@ const cargarClientes = async () => {
 
 formNuevoCliente.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const nombre = document.getElementById('cliente-nombre').value;
+  const nombre = capitalizarTexto(document.getElementById('cliente-nombre').value);
   const telefono = document.getElementById('cliente-telefono').value;
-  const colegio = document.getElementById('cliente-colegio').value;
+  const colegio = capitalizarTexto(document.getElementById('cliente-colegio').value);
 
   try {
+    await guardarReferenciaSiNoExiste("colegios", colegiosEnMemoria, colegio);
     await addDoc(collection(db, "clientes"), { nombre, telefono, colegio });
-    alert('¡Cliente registrado con éxito!');
+    Swal.fire('Registrado', 'Cliente guardado correctamente.', 'success');
     formNuevoCliente.reset();
     cargarClientes();
     cargarClientesEnMemoria(); // Actualizar el buscador también
   } catch (error) {
     console.error("Error al guardar cliente: ", error);
-    alert('Error al guardar el cliente.');
+    Swal.fire('Error', 'No se pudo guardar el cliente.', 'error');
+  }
+});
+
+// --- LÓGICA DE NUEVO CLIENTE RÁPIDO (MODAL) ---
+const formNuevoClienteRapido = document.getElementById('form-nuevo-cliente-rapido');
+
+formNuevoClienteRapido.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nombre = capitalizarTexto(document.getElementById('rapido-cliente-nombre').value);
+  const telefono = document.getElementById('rapido-cliente-telefono').value;
+  const colegio = capitalizarTexto(document.getElementById('rapido-cliente-colegio').value);
+
+  try {
+    await guardarReferenciaSiNoExiste("colegios", colegiosEnMemoria, colegio);
+    const docRef = await addDoc(collection(db, "clientes"), { nombre, telefono, colegio });
+    // Seleccionar automáticamente el cliente creado
+    seleccionarCliente({ id: docRef.id, nombre, telefono, colegio });
+    
+    // Cerrar modal y limpiar
+    bootstrap.Modal.getInstance(document.getElementById('modalNuevoClienteRapido')).hide();
+    formNuevoClienteRapido.reset();
+    cargarClientesEnMemoria(); // Actualizar lista global
+  } catch (error) {
+    console.error("Error al guardar cliente rápido: ", error);
+    Swal.fire('Error', 'No se pudo guardar el cliente.', 'error');
   }
 });
 
@@ -693,14 +1070,25 @@ listaClientesDiv.addEventListener('click', async (e) => {
   // Eliminar Cliente
   if (e.target.closest('.btn-eliminar-cliente')) {
     const id = e.target.closest('.btn-eliminar-cliente').dataset.id;
-    if (confirm('¿Estás seguro de que querés eliminar este cliente?')) {
+    
+    const result = await Swal.fire({
+      title: '¿Eliminar cliente?',
+      text: "Se borrará de la lista.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Sí, eliminar'
+    });
+
+    if (result.isConfirmed) {
       try {
         await deleteDoc(doc(db, "clientes", id));
         cargarClientes();
         cargarClientesEnMemoria();
+        Swal.fire('Eliminado', 'Cliente eliminado.', 'success');
       } catch (error) {
         console.error("Error al eliminar cliente:", error);
-        alert("Error al eliminar el cliente.");
+        Swal.fire('Error', 'No se pudo eliminar.', 'error');
       }
     }
   }
@@ -723,14 +1111,17 @@ listaClientesDiv.addEventListener('click', async (e) => {
 // Guardar cambios del cliente editado
 document.getElementById('btn-guardar-edicion-cliente').addEventListener('click', async () => {
   const id = document.getElementById('edit-cliente-id').value;
+  const colegio = capitalizarTexto(document.getElementById('edit-cliente-colegio').value);
+
   const datosActualizados = {
-    nombre: document.getElementById('edit-cliente-nombre').value,
+    nombre: capitalizarTexto(document.getElementById('edit-cliente-nombre').value),
     telefono: document.getElementById('edit-cliente-telefono').value,
-    colegio: document.getElementById('edit-cliente-colegio').value
+    colegio: colegio
   };
 
+  await guardarReferenciaSiNoExiste("colegios", colegiosEnMemoria, colegio);
   await updateDoc(doc(db, "clientes", id), datosActualizados);
-  alert("Cliente actualizado correctamente");
+  Swal.fire('Actualizado', 'Datos del cliente guardados.', 'success');
   cargarClientes();
   cargarClientesEnMemoria();
   bootstrap.Modal.getInstance(document.getElementById('modalEditarCliente')).hide();
@@ -744,7 +1135,6 @@ const filtroTexto = document.getElementById('filtro-pedidos-texto');
 const filtroEstado = document.getElementById('filtro-pedidos-estado');
 const selectAccionMasiva = document.getElementById('accion-masiva-estado');
 const btnAplicarMasivo = document.getElementById('btn-aplicar-masivo');
-let pedidosEnMemoria = []; // Para acceder rápido al detalle
 
 const cargarPedidos = async () => {
   tablaPedidosContainer.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></div>';
@@ -767,6 +1157,7 @@ const cargarPedidos = async () => {
     });
 
     filtrarYRenderizarPedidos();
+    mostrarLibrosSugeridos(); // Actualizar sugerencias con la data fresca
 
   } catch (error) {
     console.error("Error al cargar pedidos:", error);
@@ -935,7 +1326,7 @@ tablaPedidosContainer.addEventListener('click', async (e) => {
       cargarPedidos();
     } catch (error) {
       console.error("Error al actualizar estado:", error);
-      alert("No se pudo actualizar el estado.");
+      Swal.fire('Error', 'No se pudo actualizar el estado.', 'error');
     }
   }
 
@@ -963,7 +1354,7 @@ tablaPedidosContainer.addEventListener('click', async (e) => {
     mensaje += `\nTe esperamos!`;
 
     navigator.clipboard.writeText(mensaje);
-    alert("✅ Mensaje copiado al portapapeles.\n\nYa podés pegarlo en WhatsApp.");
+    Swal.fire('Copiado', 'Mensaje listo para pegar en WhatsApp.', 'success');
   }
 });
 
@@ -997,7 +1388,15 @@ btnAplicarMasivo.addEventListener('click', async () => {
 
   if (!nuevoEstado || ids.length === 0) return;
 
-  if (!confirm(`¿Estás seguro de cambiar el estado de ${ids.length} pedidos a "${nuevoEstado}"?`)) return;
+  const result = await Swal.fire({
+    title: '¿Actualización Masiva?',
+    text: `Se cambiarán ${ids.length} pedidos a "${nuevoEstado}".`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, aplicar'
+  });
+
+  if (!result.isConfirmed) return;
 
   btnAplicarMasivo.disabled = true;
   btnAplicarMasivo.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
@@ -1005,12 +1404,12 @@ btnAplicarMasivo.addEventListener('click', async () => {
   try {
     const promesas = ids.map(id => updateDoc(doc(db, "pedidos", id), { estado_general: nuevoEstado }));
     await Promise.all(promesas);
-    alert("¡Estados actualizados correctamente!");
+    Swal.fire('¡Listo!', 'Estados actualizados correctamente.', 'success');
     cargarPedidos(); // Recargar para ver cambios
     selectAccionMasiva.value = ""; // Resetear select
   } catch (error) {
     console.error("Error en actualización masiva:", error);
-    alert("Hubo un error al actualizar algunos pedidos.");
+    Swal.fire('Error', 'Hubo un error en la actualización masiva.', 'error');
   } finally {
     btnAplicarMasivo.innerHTML = 'Aplicar';
   }
@@ -1124,7 +1523,40 @@ const renderizarProduccion = (grupoAbiertoKey = null) => {
 
   const statsContainer = document.getElementById('produccion-stats');
   if (statsContainer) {
-    statsContainer.innerHTML = `📊 Resumen: <strong>${totalLibros}</strong> Libros en lista | ✅ Terminados: <strong>${totalTerminados}</strong>`;
+    const pendientes = totalLibros - totalTerminados;
+    const porcentaje = totalLibros > 0 ? Math.round((totalTerminados / totalLibros) * 100) : 0;
+
+    statsContainer.innerHTML = `
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center border-start border-4 border-primary">
+            <div>
+              <small class="text-muted text-uppercase fw-bold">Total en Lista</small>
+              <div class="fs-3 fw-bold text-primary">${totalLibros}</div>
+            </div>
+            <i class="bi bi-journal-bookmark fs-1 text-primary opacity-25"></i>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center border-start border-4 border-success">
+            <div>
+              <small class="text-muted text-uppercase fw-bold">Terminados</small>
+              <div class="fs-3 fw-bold text-success">${totalTerminados} <span class="fs-6 text-muted">(${porcentaje}%)</span></div>
+            </div>
+            <i class="bi bi-check-circle-fill fs-1 text-success opacity-25"></i>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center border-start border-4 border-warning">
+            <div>
+              <small class="text-muted text-uppercase fw-bold">Pendientes</small>
+              <div class="fs-3 fw-bold text-warning">${pendientes}</div>
+            </div>
+            <i class="bi bi-hourglass-split fs-1 text-warning opacity-25"></i>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   if (clavesFiltradas.length === 0) {
@@ -1164,10 +1596,13 @@ const renderizarProduccion = (grupoAbiertoKey = null) => {
                 </div>
               </div>
               <div class="text-end">
-                <span class="badge bg-secondary rounded-pill">${grupo.stats.total} copias</span>
-                <small class="d-block text-muted" style="font-size: 0.7rem">
-                  ${grupo.stats.pendientes} Cola | ${grupo.stats.imprimiendo} Imp | ${grupo.stats.encuadernando} Enc | ${grupo.stats.terminados} OK
-                </small>
+                <span class="badge bg-secondary rounded-pill mb-1">${grupo.stats.total} copias</span>
+                <div class="d-flex gap-1 justify-content-end">
+                  <span class="badge bg-warning text-dark" title="En Cola">${grupo.stats.pendientes} Cola</span>
+                  <span class="badge bg-info text-dark" title="Imprimiendo">${grupo.stats.imprimiendo} Imp</span>
+                  <span class="badge bg-primary" title="Encuadernando">${grupo.stats.encuadernando} Enc</span>
+                  <span class="badge bg-success" title="Terminados">${grupo.stats.terminados} OK</span>
+                </div>
               </div>
             </div>
           </button>
@@ -1267,10 +1702,18 @@ tablaProduccionContainer.addEventListener('click', async (e) => {
       return { pedidoId, itemIndex: parseInt(itemIndex) };
     });
 
-    if (!nuevoEstado) { alert("Seleccioná un estado destino."); return; }
-    if (seleccionados.length === 0) { alert("Seleccioná al menos un libro de la lista."); return; }
+    if (!nuevoEstado) { Swal.fire('Atención', 'Seleccioná un estado destino.', 'warning'); return; }
+    if (seleccionados.length === 0) { Swal.fire('Atención', 'Seleccioná al menos un libro.', 'warning'); return; }
 
-    if (!confirm(`¿Cambiar ${seleccionados.length} libros a estado "${nuevoEstado}"?`)) return;
+    const result = await Swal.fire({
+      title: '¿Cambiar estados?',
+      text: `Se actualizarán ${seleccionados.length} libros a "${nuevoEstado}".`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cambiar'
+    });
+
+    if (!result.isConfirmed) return;
 
     btnMasivo.disabled = true;
     btnMasivo.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
@@ -1333,14 +1776,18 @@ const actualizarEstadoItem = async (pedidoId, itemIndex, nuevoEstado, recargar =
         if (itemsTerminados === items.length && nuevoEstado === 'Terminado') {
            // Buscar nombre cliente en memoria para el alert
            const clienteNombre = clientesEnMemoria.find(c => c.id === pedidoData.id_cliente)?.nombre || 'Cliente';
-           alert(`🎉 ¡Atención! El pedido de ${clienteNombre} se ha completado en su totalidad.`);
+           Swal.fire({
+             title: '¡Pedido Completo! 🎉',
+             text: `El pedido de ${clienteNombre} se ha completado en su totalidad.`,
+             icon: 'success'
+           });
         }
         await cargarColaProduccion(groupKey);
       }
     }
   } catch (error) {
     console.error("Error al actualizar item:", error);
-    if(recargar) alert("Error al actualizar el estado del libro.");
+    if(recargar) Swal.fire('Error', 'No se pudo actualizar el estado.', 'error');
   }
 };
 

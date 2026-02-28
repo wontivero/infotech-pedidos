@@ -47,49 +47,50 @@
             <hr>
 
             <h4>1. Gestor de Pedidos</h4>
-            <p>Es la pantalla principal de trabajo para la toma de pedidos.</p>
+            <p>Es la pantalla principal, rediseñada para agilizar la atención al público.</p>
             
-            <h5><i class="bi bi-search"></i> Buscadores Inteligentes</h5>
-            <ul>
-                <li><strong>Clientes:</strong> Buscá por nombre o teléfono. El sistema filtra en tiempo real.</li>
-                <li><strong>Libros:</strong> Buscá por título, editorial o precio. Podés navegar con las flechas del teclado y presionar <code>Enter</code> para agregar al carrito rápidamente.</li>
-            </ul>
-
-            <h5><i class="bi bi-cart"></i> Carrito y Totales</h5>
-            <ul>
-                <li>Los libros agregados aparecen en una tabla con su miniatura (hacé click en la imagen para agrandarla).</li>
-                <li>Podés eliminar ítems con el botón de basura.</li>
-                <li><strong>Cálculo de Seña:</strong> Al ingresar el monto en "Seña Pagada", el "Saldo Pendiente" se actualiza automáticamente.</li>
-            </ul>
-
-            <h5><i class="bi bi-file-earmark-text"></i> Presupuestos</h5>
-            <ul>
-                <li><strong>Generar Presupuesto:</strong> Guarda los ítems actuales bajo un código que empieza con <strong>P</strong> (ej: <code>P12345</code>). Copia automáticamente un mensaje formateado para WhatsApp al portapapeles.</li>
-                <li><strong>Cargar Presupuesto:</strong> Ingresá el código (ej: <code>P12345</code>) en el campo superior y clickeá "Cargar". Esto recupera el cliente, los libros y los montos para finalizar la venta rápidamente.</li>
-            </ul>
-
-            <h5><i class="bi bi-check-circle"></i> Generar Pedido</h5>
-            <ul>
-                <li>Guarda el pedido definitivo en la base de datos.</li>
-                <li>Genera un <strong>Código de Seguimiento numérico</strong> (ej: <code>54821</code>).</li>
-                <li>Copia al portapapeles un mensaje de confirmación listo para enviar al cliente con el link de seguimiento.</li>
-            </ul>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card h-100 border-primary border-opacity-25">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary"><i class="bi bi-search"></i> Buscador Visual (Izquierda)</h5>
+                            <ul>
+                                <li><strong>Tarjetas:</strong> Los libros aparecen con su portada y precio grande.</li>
+                                <li><strong>Sugerencias:</strong> Si el buscador está vacío, te muestra los <strong>Más Vendidos</strong> de los últimos 30 días.</li>
+                                <li><strong>Info Detallada:</strong> Hacé clic en el botón <i class="bi bi-info-circle"></i> de cada libro para ver estadísticas de ventas y stock.</li>
+                                <li><strong>Zoom:</strong> Clic en la foto pequeña para verla en grande.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100 border-success border-opacity-25">
+                        <div class="card-body">
+                            <h5 class="card-title text-success"><i class="bi bi-cart"></i> Carrito y Acciones (Derecha)</h5>
+                            <ul>
+                                <li><strong>Cliente Rápido:</strong> Usá el botón <i class="bi bi-person-plus-fill"></i> para registrar un cliente nuevo sin salir de la pantalla.</li>
+                                <li><strong>Agrupación:</strong> Si agregás el mismo libro varias veces, se agrupa en una sola línea (ej: <em>Matemática 1 (x2)</em>).</li>
+                                <li><strong>Atajos de Teclado:</strong>
+                                    <ul>
+                                        <li><span class="badge bg-dark">F1</span> <strong>Confirmar Pedido:</strong> Guarda y genera el mensaje de WhatsApp.</li>
+                                        <li><span class="badge bg-dark">F2</span> <strong>Presupuestar:</strong> Genera un presupuesto rápido para enviar.</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Validación de Seña:</strong> El sistema te avisa si intentás cargar una seña mayor al total.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <hr>
 
-            <h4>2. ABM Libros</h4>
+            <h4>2. Gestión Inteligente (ABM)</h4>
+            <p>El sistema aprende de lo que cargás para facilitar futuras cargas.</p>
             <ul>
-                <li>Permite cargar nuevos libros al catálogo.</li>
-                <li><strong>Imagen:</strong> Se sube a la nube y se muestra una miniatura en las listas.</li>
-                <li>Campos: Título, Páginas, Editorial, Precio.</li>
-            </ul>
-
-            <hr>
-
-            <h4>3. ABM Clientes</h4>
-            <ul>
-                <li>Registro rápido de clientes con Nombre, Teléfono y Colegio.</li>
-                <li>Estos clientes aparecen luego en el buscador del Gestor de Pedidos.</li>
+                <li><strong>Autocompletado:</strong> Al cargar un libro o cliente, si escribís una Editorial o Colegio nuevo, el sistema lo guarda. La próxima vez, aparecerá en la lista de sugerencias.</li>
+                <li><strong>Títulos de Libros:</strong> Al cargar un libro nuevo, te sugiere títulos existentes para que ahorres tiempo (ej: escribís "Matemática" y te sugiere "Matemática 1", solo cambiás el número).</li>
+                <li><strong>Formato Automático:</strong> Todos los nombres y títulos se guardan automáticamente con la primera letra en mayúscula.</li>
             </ul>
 
             <hr>
