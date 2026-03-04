@@ -2,7 +2,7 @@
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { capitalizarTexto } from "./utils.js";
-import { cargarClientesEnMemoria, guardarReferenciaSiNoExiste, colegiosEnMemoria, clientesEnMemoria } from "./data.js";
+import { suscribirCambios, guardarReferenciaSiNoExiste, colegiosEnMemoria, clientesEnMemoria } from "./data.js";
 import { seleccionarCliente } from "./gestor-pedidos.js"; // Importamos para el cliente rápido
 
 const formNuevoCliente = document.getElementById('form-nuevo-cliente');
@@ -10,22 +10,18 @@ const listaClientesDiv = document.getElementById('lista-clientes');
 const formNuevoClienteRapido = document.getElementById('form-nuevo-cliente-rapido');
 
 export const inicializarClientes = () => {
-  cargarClientes();
+  renderizarTablaClientes();
+  suscribirCambios('clientes', renderizarTablaClientes);
   setupEventListeners();
 };
 
-const cargarClientes = async () => {
-  listaClientesDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
-  try {
-    const querySnapshot = await getDocs(collection(db, "clientes"));
-    if (querySnapshot.empty) { listaClientesDiv.innerHTML = '<div class="alert alert-info">No hay clientes.</div>'; return; }
-    let tableHTML = `<table class="table table-striped table-hover"><thead><tr><th>Nombre</th><th>Teléfono</th><th>Colegio</th><th>Acciones</th></tr></thead><tbody>`;
-    querySnapshot.forEach((doc) => {
-      const c = doc.data();
-      tableHTML += `<tr><td>${c.nombre}</td><td>${c.telefono || '-'}</td><td>${c.colegio || '-'}</td><td><button class="btn btn-warning btn-sm btn-editar-cliente" data-id="${doc.id}"><i class="bi bi-pencil"></i></button> <button class="btn btn-danger btn-sm btn-eliminar-cliente" data-id="${doc.id}"><i class="bi bi-trash"></i></button></td></tr>`;
-    });
-    listaClientesDiv.innerHTML = tableHTML + `</tbody></table>`;
-  } catch (error) { console.error(error); }
+const renderizarTablaClientes = () => {
+  if (clientesEnMemoria.length === 0) { listaClientesDiv.innerHTML = '<div class="alert alert-info">No hay clientes.</div>'; return; }
+  let tableHTML = `<table class="table table-striped table-hover"><thead><tr><th>Nombre</th><th>Teléfono</th><th>Colegio</th><th>Acciones</th></tr></thead><tbody>`;
+  clientesEnMemoria.forEach((c) => {
+    tableHTML += `<tr><td>${c.nombre}</td><td>${c.telefono || '-'}</td><td>${c.colegio || '-'}</td><td><button class="btn btn-warning btn-sm btn-editar-cliente" data-id="${c.id}"><i class="bi bi-pencil"></i></button> <button class="btn btn-danger btn-sm btn-eliminar-cliente" data-id="${c.id}"><i class="bi bi-trash"></i></button></td></tr>`;
+  });
+  listaClientesDiv.innerHTML = tableHTML + `</tbody></table>`;
 };
 
 const setupEventListeners = () => {
@@ -38,7 +34,6 @@ const setupEventListeners = () => {
       document.getElementById('cliente-colegio').value,
       formNuevoCliente
     );
-    cargarClientes();
   });
 
   // Nuevo Cliente Rápido (Modal)
@@ -59,7 +54,7 @@ const setupEventListeners = () => {
     if (e.target.closest('.btn-eliminar-cliente')) {
       const id = e.target.closest('.btn-eliminar-cliente').dataset.id;
       const result = await Swal.fire({ title: '¿Eliminar?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sí' });
-      if (result.isConfirmed) { await deleteDoc(doc(db, "clientes", id)); cargarClientes(); cargarClientesEnMemoria(); Swal.fire('Eliminado', '', 'success'); }
+      if (result.isConfirmed) { await deleteDoc(doc(db, "clientes", id)); Swal.fire('Eliminado', '', 'success'); }
     }
     if (e.target.closest('.btn-editar-cliente')) {
       const id = e.target.closest('.btn-editar-cliente').dataset.id;
@@ -82,7 +77,6 @@ const setupEventListeners = () => {
     await guardarReferenciaSiNoExiste("colegios", colegiosEnMemoria, colegio);
     await updateDoc(doc(db, "clientes", id), datos);
     Swal.fire('Actualizado', '', 'success');
-    cargarClientes(); cargarClientesEnMemoria();
     bootstrap.Modal.getInstance(document.getElementById('modalEditarCliente')).hide();
   });
 };
@@ -92,6 +86,6 @@ const guardarCliente = async (nombre, telefono, colegio, form) => {
   await guardarReferenciaSiNoExiste("colegios", colegiosEnMemoria, c);
   const docRef = await addDoc(collection(db, "clientes"), { nombre: n, telefono, colegio: c });
   Swal.fire('Registrado', '', 'success');
-  form.reset(); await cargarClientesEnMemoria();
+  form.reset();
   return docRef;
 };

@@ -2,7 +2,7 @@
 // Se encarga de inicializar la app y exportar las referencias a la BD y Storage.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-storage.js";
 
 // Configuración de Firebase (Tus credenciales)
@@ -18,4 +18,5 @@ const firebaseConfig = {
 // Inicializar y exportar
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export { onSnapshot }; // Exportamos onSnapshot para usarlo en otros módulos
 export const storage = getStorage(app);

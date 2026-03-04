@@ -10,6 +10,7 @@ let totalPedido = 0;
 let clienteSeleccionado = null;
 let resultadosBusqueda = [];
 let selectedIndex = -1;
+let presupuestoOrigen = null; // Para rastrear si viene de un presupuesto
 
 // Elementos DOM
 const inputBuscarCliente = document.getElementById('input-buscar-cliente');
@@ -21,8 +22,10 @@ const inputSena = document.getElementById('sena-pagada');
 const btnGenerarPedido = document.getElementById('btn-generar-pedido');
 const btnGenerarPresupuesto = document.getElementById('btn-generar-presupuesto');
 const btnCargarPresupuesto = document.getElementById('btn-cargar-presupuesto');
+const inputPresupuestoCodigo = document.getElementById('input-presupuesto-codigo');
 
 export const inicializarGestorPedidos = () => {
+  inputPresupuestoCodigo.value = "P";
   setupEventListeners();
   mostrarLibrosSugeridos();
 };
@@ -66,6 +69,14 @@ const setupEventListeners = () => {
   btnGenerarPedido.addEventListener('click', confirmarPedido);
   btnGenerarPresupuesto.addEventListener('click', generarPresupuesto);
   btnCargarPresupuesto.addEventListener('click', cargarPresupuesto);
+
+  // Enter en campo de presupuesto
+  inputPresupuestoCodigo.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      cargarPresupuesto();
+    }
+  });
 
   // Atajos Teclado
   document.addEventListener('keydown', (e) => {
@@ -198,6 +209,7 @@ const confirmarPedido = async () => {
     await addDoc(collection(db, "pedidos"), {
       codigo_seguimiento: codigo,
       id_cliente: clienteSeleccionado.id,
+      presupuesto_origen: presupuestoOrigen, // Guardamos la referencia
       items: itemsExpandidos,
       total: totalPedido,
       sena_pagada: sena,
@@ -223,7 +235,7 @@ const confirmarPedido = async () => {
     
     // Reset
     carrito = []; totalPedido = 0; inputSena.value = ""; clienteSeleccionado = null; inputBuscarCliente.value = "";
-    renderizarCarrito(); actualizarTotales();
+    presupuestoOrigen = null; renderizarCarrito(); actualizarTotales(); inputPresupuestoCodigo.value = "P";
   } catch (e) { console.error(e); Swal.fire('Error', 'Falló al crear pedido.', 'error'); }
   finally { btn.disabled = false; btn.innerHTML = txt; }
 };
@@ -271,12 +283,30 @@ const generarPresupuesto = async () => {
     msg += `(Por favor enviar comprobante)`;
     
     navigator.clipboard.writeText(msg);
-    Swal.fire({ title: 'Presupuesto Listo', html: `Ref: <strong>${codigo}</strong><br>Copiado.`, icon: 'success' });
+    
+    // Alerta con opciones
+    const result = await Swal.fire({
+      title: 'Presupuesto Listo',
+      html: `Ref: <strong>${codigo}</strong><br>Copiado al portapapeles.`,
+      icon: 'success',
+      showCancelButton: true,
+      confirmButtonText: 'Cerrar',
+      cancelButtonText: 'Crear Otro (Limpiar)',
+      cancelButtonColor: '#6c757d'
+    });
+
+    // Si elige "Crear Otro", limpiamos todo
+    if (result.dismiss === Swal.DismissReason.cancel) {
+      carrito = []; totalPedido = 0; inputSena.value = ""; clienteSeleccionado = null; inputBuscarCliente.value = "";
+      presupuestoOrigen = null;
+      renderizarCarrito(); actualizarTotales();
+      inputPresupuestoCodigo.value = "P";
+    }
   } finally { btn.disabled = false; btn.innerHTML = txt; }
 };
 
 const cargarPresupuesto = async () => {
-  const codigo = document.getElementById('input-presupuesto-codigo').value.trim().toUpperCase();
+  const codigo = inputPresupuestoCodigo.value.trim().toUpperCase();
   if (!codigo) { Swal.fire('Atención', 'Ingresá código.', 'warning'); return; }
   
   try {
@@ -285,6 +315,7 @@ const cargarPresupuesto = async () => {
     if (snap.empty) { Swal.fire('Error', 'No existe.', 'error'); return; }
     
     const p = snap.docs[0].data();
+    presupuestoOrigen = p.codigo; // Guardamos el origen
     carrito = [];
     // Reagrupar items
     p.items.forEach(item => {

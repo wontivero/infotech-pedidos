@@ -1,7 +1,7 @@
 // --- MÓDULO COLA DE PRODUCCIÓN ---
 import { collection, getDocs, query, orderBy, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase.js";
-import { clientesEnMemoria } from "./data.js";
+import { clientesEnMemoria, pedidosEnMemoria, suscribirCambios } from "./data.js";
 
 const container = document.getElementById('tabla-produccion-container');
 const btnRefrescar = document.getElementById('btn-refrescar-produccion');
@@ -9,19 +9,24 @@ const filtroLibro = document.getElementById('filtro-produccion-libro');
 let gruposProduccion = {};
 
 export const inicializarProduccion = () => {
-  cargarColaProduccion();
+  suscribirCambios('pedidos', () => procesarYRenderizar());
+  procesarYRenderizar();
   setupEventListeners();
 };
 
-const cargarColaProduccion = async (grupoAbiertoKey = null) => {
-  if (!grupoAbiertoKey) container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-warning"></div></div>';
+let ultimoGrupoAbierto = null; // Recordar estado visual
+
+const procesarYRenderizar = (grupoAbiertoKey = null) => {
+  if(grupoAbiertoKey) ultimoGrupoAbierto = grupoAbiertoKey;
+
   try {
-    const q = query(collection(db, "pedidos"), orderBy("fecha_creacion", "asc"));
-    const snap = await getDocs(q);
     gruposProduccion = {};
 
-    snap.forEach(doc => {
-      const p = doc.data();
+    // Usamos pedidosEnMemoria que ya está actualizado por data.js
+    // Ordenamos por fecha ascendente (más viejos primero para producción)
+    const pedidosOrdenados = [...pedidosEnMemoria].sort((a, b) => (a.fecha_creacion?.seconds || 0) - (b.fecha_creacion?.seconds || 0));
+
+    pedidosOrdenados.forEach(p => {
       if (p.estado_general === 'Entregado') return;
       const c = clientesEnMemoria.find(cl => cl.id === p.id_cliente)?.nombre || 'Desc.';
       const fecha = p.fecha_creacion ? new Date(p.fecha_creacion.seconds * 1000).toLocaleDateString() : '-';
@@ -30,7 +35,7 @@ const cargarColaProduccion = async (grupoAbiertoKey = null) => {
         const key = `${item.titulo} - ${item.editorial}`;
         if (!gruposProduccion[key]) gruposProduccion[key] = { titulo: item.titulo, editorial: item.editorial, items: [], stats: { total: 0, pendientes: 0, imprimiendo: 0, encuadernando: 0, terminados: 0 } };
         
-        const flatItem = { pedidoId: doc.id, pedidoCodigo: p.codigo_seguimiento, cliente: c, fecha, itemIndex: idx, estadoItem: item.estado || 'En cola de impresión' };
+        const flatItem = { pedidoId: p.id, pedidoCodigo: p.codigo_seguimiento, cliente: c, fecha, itemIndex: idx, estadoItem: item.estado || 'En cola de impresión' };
         gruposProduccion[key].items.push(flatItem);
         gruposProduccion[key].stats.total++;
         
@@ -40,8 +45,8 @@ const cargarColaProduccion = async (grupoAbiertoKey = null) => {
         else gruposProduccion[key].stats.pendientes++;
       });
     });
-    renderizar(grupoAbiertoKey);
-  } catch (e) { console.error(e); container.innerHTML = '<div class="alert alert-danger">Error.</div>'; }
+    renderizar(ultimoGrupoAbierto);
+  } catch (e) { console.error(e); }
 };
 
 const renderizar = (grupoAbiertoKey) => {
@@ -93,7 +98,7 @@ const renderizar = (grupoAbiertoKey) => {
 };
 
 const setupEventListeners = () => {
-  btnRefrescar.addEventListener('click', () => cargarColaProduccion());
+  btnRefrescar.addEventListener('click', () => procesarYRenderizar());
   filtroLibro.addEventListener('input', () => renderizar());
   document.querySelectorAll('.check-filtro-estado').forEach(c => c.addEventListener('change', () => renderizar()));
 
@@ -102,7 +107,7 @@ const setupEventListeners = () => {
       const sel = e.target;
       sel.disabled = true;
       await actualizarItem(sel.dataset.pid, parseInt(sel.dataset.idx), sel.value);
-      await cargarColaProduccion(sel.dataset.key);
+      ultimoGrupoAbierto = sel.dataset.key; // Guardar para mantener abierto tras update
     }
   });
 
@@ -116,7 +121,7 @@ const setupEventListeners = () => {
       e.target.disabled = true;
       const items = Array.from(checks).map(c => { const [pid, idx] = c.value.split('|'); return { pedidoId: pid, itemIndex: parseInt(idx) }; });
       await actualizarMasivo(items, estado);
-      await cargarColaProduccion(key);
+      ultimoGrupoAbierto = key;
     }
   });
 };

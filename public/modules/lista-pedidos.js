@@ -2,7 +2,7 @@
 import { collection, getDocs, query, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { formatter } from "./utils.js";
-import { clientesEnMemoria, pedidosEnMemoria, cargarPedidosEnMemoria } from "./data.js";
+import { clientesEnMemoria, pedidosEnMemoria, suscribirCambios } from "./data.js";
 import { mostrarLibrosSugeridos } from "./gestor-pedidos.js";
 
 const container = document.getElementById('tabla-pedidos-container');
@@ -13,36 +13,42 @@ const btnMasivo = document.getElementById('btn-aplicar-masivo');
 const selectMasivo = document.getElementById('accion-masiva-estado');
 
 export const inicializarListaPedidos = () => {
-  cargarPedidos();
-  setupEventListeners();
-};
-
-export const cargarPedidos = async () => {
-  container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
-  try {
-    await cargarPedidosEnMemoria(); // Actualiza la variable global pedidosEnMemoria
+  // Suscribirse a cambios en pedidos Y clientes (para mostrar nombres actualizados)
+  suscribirCambios('pedidos', () => {
     filtrarYRenderizar();
-    mostrarLibrosSugeridos(); // Actualiza sugerencias del gestor
-  } catch (e) { console.error(e); container.innerHTML = '<div class="alert alert-danger">Error cargando pedidos.</div>'; }
+    mostrarLibrosSugeridos(); // Actualizar sugerencias del gestor
+  });
+  suscribirCambios('clientes', filtrarYRenderizar);
+  
+  filtrarYRenderizar(); // Render inicial
+  setupEventListeners();
 };
 
 const filtrarYRenderizar = () => {
   const txt = filtroTexto.value.toLowerCase();
   const est = filtroEstado.value;
 
-  const filtrados = pedidosEnMemoria.filter(p => {
-    const c = clientesEnMemoria.find(cl => cl.id === p.id_cliente);
-    const nombre = c ? c.nombre.toLowerCase() : '';
-    const cod = p.codigo_seguimiento ? p.codigo_seguimiento.toString() : '';
-    return (nombre.includes(txt) || cod.includes(txt)) && (est === "" || p.estado_general === est);
-  });
+  const filtrados = pedidosEnMemoria
+    .sort((a, b) => { // Ordenar por fecha descendente (más nuevo primero)
+      const fa = a.fecha_creacion ? (a.fecha_creacion.seconds || new Date(a.fecha_creacion).getTime()) : 0;
+      const fb = b.fecha_creacion ? (b.fecha_creacion.seconds || new Date(b.fecha_creacion).getTime()) : 0;
+      return fb - fa;
+    })
+    .filter(p => {
+      const c = clientesEnMemoria.find(cl => cl.id === p.id_cliente);
+      const nombre = c ? c.nombre.toLowerCase() : '';
+      const telefono = c && c.telefono ? c.telefono.toString() : '';
+      const cod = p.codigo_seguimiento ? p.codigo_seguimiento.toString() : '';
+      return (nombre.includes(txt) || cod.includes(txt) || telefono.includes(txt)) && (est === "" || p.estado_general === est);
+    });
 
   if (filtrados.length === 0) { container.innerHTML = '<div class="alert alert-warning">No hay pedidos.</div>'; return; }
 
-  let html = `<table class="table table-hover align-middle"><thead class="table-light"><tr><th style="width:40px"><input type="checkbox" id="check-todos"></th><th>Fecha</th><th>Código</th><th>Cliente</th><th>Estado</th><th>Progreso</th><th>Saldo</th><th>Acciones</th></tr></thead><tbody>`;
+  let html = `<table class="table table-hover align-middle"><thead class="table-light"><tr><th style="width:40px"><input type="checkbox" id="check-todos"></th><th>Fecha</th><th>Código</th><th>Ref. Presup.</th><th>Cliente</th><th>Estado</th><th>Progreso</th><th>Saldo</th><th>Acciones</th></tr></thead><tbody>`;
 
   filtrados.forEach(p => {
-    const fecha = p.fecha_creacion ? new Date(p.fecha_creacion.seconds * 1000).toLocaleDateString() : '-';
+    const fechaObj = p.fecha_creacion ? new Date(p.fecha_creacion.seconds * 1000) : null;
+    const fecha = fechaObj ? `${fechaObj.toLocaleDateString()}<br><small class="text-muted">${fechaObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>` : '-';
     let badge = 'bg-secondary';
     if (p.estado_general === 'En cola de impresión') badge = 'bg-warning text-dark';
     if (p.estado_general === 'Imprimiendo / Armando') badge = 'bg-info text-dark';
@@ -59,6 +65,7 @@ const filtrarYRenderizar = () => {
       <td><input type="checkbox" class="form-check-input check-pedido" value="${p.id}"></td>
       <td><small>${fecha}</small></td>
       <td class="fw-bold text-primary">${p.codigo_seguimiento}</td>
+      <td>${p.presupuesto_origen ? `<span class="badge bg-light text-dark border">${p.presupuesto_origen}</span>` : '-'}</td>
       <td>${clientesEnMemoria.find(c => c.id === p.id_cliente)?.nombre || 'Unknown'}</td>
       <td><span class="badge ${badge}">${p.estado_general}</span></td>
       <td>${prog}</td>
@@ -80,12 +87,44 @@ const filtrarYRenderizar = () => {
     </tr>`;
   });
   container.innerHTML = html + '</tbody></table>';
+  
+  // Resetear estado del botón masivo al renderizar
+  actualizarBotonMasivo();
 };
 
 const setupEventListeners = () => {
-  btnRefrescar.addEventListener('click', cargarPedidos);
+  btnRefrescar.addEventListener('click', filtrarYRenderizar);
   filtroTexto.addEventListener('input', filtrarYRenderizar);
   filtroEstado.addEventListener('change', filtrarYRenderizar);
+
+  // --- LÓGICA DE CHECKBOXES Y ACCIONES MASIVAS ---
+  
+  container.addEventListener('change', (e) => {
+    // 1. Checkbox "Seleccionar Todos"
+    if (e.target.id === 'check-todos') {
+      const checkboxes = container.querySelectorAll('.check-pedido');
+      checkboxes.forEach(cb => cb.checked = e.target.checked);
+    }
+    // 2. Actualizar estado del botón masivo
+    if (e.target.classList.contains('check-pedido') || e.target.id === 'check-todos') {
+      actualizarBotonMasivo();
+    }
+  });
+
+  selectMasivo.addEventListener('change', actualizarBotonMasivo);
+
+  btnMasivo.addEventListener('click', async () => {
+    const nuevoEstado = selectMasivo.value;
+    const checkboxes = container.querySelectorAll('.check-pedido:checked');
+    const ids = Array.from(checkboxes).map(cb => cb.value);
+
+    if (!nuevoEstado || ids.length === 0) return;
+
+    const result = await Swal.fire({ title: '¿Actualización Masiva?', text: `Se cambiarán ${ids.length} pedidos a "${nuevoEstado}".`, icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, aplicar' });
+    if (!result.isConfirmed) return;
+
+    await actualizarMasivoPedidos(ids, nuevoEstado);
+  });
 
   container.addEventListener('click', async (e) => {
     // Detalle
@@ -103,14 +142,13 @@ const setupEventListeners = () => {
     if (e.target.closest('.btn-est')) {
       e.preventDefault();
       await updateDoc(doc(db, "pedidos", e.target.closest('.btn-est').dataset.id), { estado_general: e.target.closest('.btn-est').dataset.val });
-      cargarPedidos();
     }
     // WhatsApp
     if (e.target.closest('.btn-wa')) {
       const p = pedidosEnMemoria.find(x => x.id === e.target.closest('.btn-wa').dataset.id);
       const c = clientesEnMemoria.find(x => x.id === p.id_cliente);
       const nombreCliente = c ? c.nombre : 'Cliente';
-
+ 
       let msg = `Hola ${nombreCliente}! 👋\n`;
       msg += `¡Buenas noticias! Tu pedido ya está completo y listo para retirar. 📚✨\n\n`;
       msg += `🔢 *Para retirar, por favor indicanos el número de pedido:* *${p.codigo_seguimiento}*\n\n`;
@@ -127,4 +165,23 @@ const setupEventListeners = () => {
       Swal.fire('Copiado', 'Mensaje listo para pegar en WhatsApp.', 'success');
     }
   });
+};
+
+// --- FUNCIONES AUXILIARES ---
+
+const actualizarBotonMasivo = () => {
+  const checkboxes = container.querySelectorAll('.check-pedido:checked');
+  btnMasivo.disabled = checkboxes.length === 0 || selectMasivo.value === "";
+};
+
+const actualizarMasivoPedidos = async (ids, nuevoEstado) => {
+  btnMasivo.disabled = true;
+  btnMasivo.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try {
+    const promesas = ids.map(id => updateDoc(doc(db, "pedidos", id), { estado_general: nuevoEstado }));
+    await Promise.all(promesas);
+    Swal.fire('¡Listo!', 'Estados actualizados correctamente.', 'success');
+    selectMasivo.value = "";
+  } catch (error) { console.error(error); Swal.fire('Error', 'Falló la actualización masiva.', 'error'); }
+  finally { btnMasivo.innerHTML = 'Aplicar'; }
 };

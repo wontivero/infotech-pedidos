@@ -2,29 +2,27 @@
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { capitalizarTexto, subirImagen, formatter } from "./utils.js";
-import { cargarLibrosEnMemoria, guardarReferenciaSiNoExiste, editorialesEnMemoria, librosEnMemoria } from "./data.js";
+import { suscribirCambios, guardarReferenciaSiNoExiste, editorialesEnMemoria, librosEnMemoria } from "./data.js";
 
 const formNuevoLibro = document.getElementById('form-nuevo-libro');
 const listaLibrosDiv = document.getElementById('lista-libros');
 
 export const inicializarLibros = () => {
-  cargarLibros();
+  // Renderizar inicialmente y cada vez que cambien los datos
+  renderizarTablaLibros();
+  suscribirCambios('libros', renderizarTablaLibros);
   setupEventListeners();
 };
 
-const cargarLibros = async () => {
-  listaLibrosDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
-  try {
-    const querySnapshot = await getDocs(collection(db, "libros"));
-    if (querySnapshot.empty) {
-      listaLibrosDiv.innerHTML = '<div class="alert alert-info">No hay libros cargados todavía.</div>';
-      return;
-    }
-    let tableHTML = `<table class="table table-striped table-hover align-middle">
+const renderizarTablaLibros = () => {
+  if (librosEnMemoria.length === 0) {
+    listaLibrosDiv.innerHTML = '<div class="alert alert-info">No hay libros cargados todavía.</div>';
+    return;
+  }
+  let tableHTML = `<table class="table table-striped table-hover align-middle">
       <thead><tr><th>Portada</th><th>Título</th><th>Páginas</th><th>Editorial</th><th>Precio</th><th>Acciones</th></tr></thead>
       <tbody>`;
-    querySnapshot.forEach((doc) => {
-      const libro = doc.data();
+  librosEnMemoria.forEach((libro) => {
       tableHTML += `<tr>
         <td><img src="${libro.imageUrl || 'https://via.placeholder.com/50x75'}" width="50" class="img-thumbnail" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalImagen" data-img-url="${libro.imageUrl || 'https://via.placeholder.com/50x75'}"></td>
         <td>${libro.titulo || 'Sin Título'}</td>
@@ -32,17 +30,13 @@ const cargarLibros = async () => {
         <td>${libro.editorial || 'N/A'}</td>
         <td>${formatter.format(libro.precio || 0)}</td>
         <td>
-          <button class="btn btn-warning btn-sm btn-editar-libro" data-id="${doc.id}"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-danger btn-sm btn-eliminar-libro" data-id="${doc.id}"><i class="bi bi-trash"></i></button>
+          <button class="btn btn-warning btn-sm btn-editar-libro" data-id="${libro.id}"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-danger btn-sm btn-eliminar-libro" data-id="${libro.id}"><i class="bi bi-trash"></i></button>
         </td>
       </tr>`;
-    });
-    tableHTML += `</tbody></table>`;
-    listaLibrosDiv.innerHTML = tableHTML;
-  } catch (error) {
-    console.error("Error al cargar libros:", error);
-    listaLibrosDiv.innerHTML = `<div class="alert alert-danger">Error al cargar la lista.</div>`;
-  }
+  });
+  tableHTML += `</tbody></table>`;
+  listaLibrosDiv.innerHTML = tableHTML;
 };
 
 const setupEventListeners = () => {
@@ -70,8 +64,6 @@ const setupEventListeners = () => {
       await addDoc(collection(db, "libros"), libroData);
       Swal.fire('¡Guardado!', 'El libro se cargó correctamente.', 'success');
       formNuevoLibro.reset();
-      await cargarLibros();
-      await cargarLibrosEnMemoria();
     } catch (error) {
       Swal.fire('Error', 'No se pudo guardar el libro.', 'error');
     } finally {
@@ -86,8 +78,6 @@ const setupEventListeners = () => {
       const result = await Swal.fire({ title: '¿Eliminar libro?', text: "No podrás revertir esto.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sí, eliminar' });
       if (result.isConfirmed) {
         await deleteDoc(doc(db, "libros", id));
-        cargarLibros();
-        cargarLibrosEnMemoria();
         Swal.fire('Eliminado', 'El libro ha sido eliminado.', 'success');
       }
     }
@@ -113,7 +103,6 @@ const setupEventListeners = () => {
     await guardarReferenciaSiNoExiste("editoriales", editorialesEnMemoria, editorial);
     await updateDoc(doc(db, "libros", id), datos);
     Swal.fire('Actualizado', 'Datos guardados.', 'success');
-    cargarLibros(); await cargarLibrosEnMemoria();
     bootstrap.Modal.getInstance(document.getElementById('modalEditarLibro')).hide();
   });
 };
