@@ -205,7 +205,11 @@ const agregarAlCarrito = (libro) => {
   
   const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
   Toast.fire({ icon: 'success', title: 'Agregado al pedido' });
-  inputBuscarLibro.focus();
+  
+  // Solo enfocar en pantallas grandes para evitar saltos de scroll en móviles
+  if (window.innerWidth >= 768) {
+    inputBuscarLibro.focus();
+  }
 };
 
 const renderizarCarrito = () => {

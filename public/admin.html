@@ -73,28 +73,38 @@
   </nav>
 
   <main class="container mt-4">
+    <!-- Menú Hamburguesa (Solo Mobile) -->
+    <nav class="navbar navbar-light bg-white rounded shadow-sm mb-3 d-md-none border">
+      <div class="container-fluid">
+        <span class="navbar-brand h6 mb-0 text-primary"><i class="bi bi-grid-fill"></i> Menú de Secciones</span>
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#adminTab" aria-controls="adminTab" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+      </div>
+    </nav>
+
     <!-- 2. Sistema de Navegación por Pestañas -->
-    <ul class="nav nav-tabs" id="adminTab" role="tablist">
+    <ul class="nav nav-tabs flex-column flex-md-row collapse d-md-flex mb-3 mb-md-0" id="adminTab" role="tablist">
       <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="pedidos-tab" data-bs-toggle="tab" data-bs-target="#pedidos-tab-pane"
+        <button class="nav-link active w-100 text-start text-md-center" id="pedidos-tab" data-bs-toggle="tab" data-bs-target="#pedidos-tab-pane"
           type="button" role="tab" aria-controls="pedidos-tab-pane" aria-selected="true">Gestor de Pedidos</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="libros-tab" data-bs-toggle="tab" data-bs-target="#libros-tab-pane" type="button"
+        <button class="nav-link w-100 text-start text-md-center" id="libros-tab" data-bs-toggle="tab" data-bs-target="#libros-tab-pane" type="button"
           role="tab" aria-controls="libros-tab-pane" aria-selected="false">ABM Libros</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="clientes-tab" data-bs-toggle="tab" data-bs-target="#clientes-tab-pane"
+        <button class="nav-link w-100 text-start text-md-center" id="clientes-tab" data-bs-toggle="tab" data-bs-target="#clientes-tab-pane"
           type="button" role="tab" aria-controls="clientes-tab-pane" aria-selected="false">ABM Clientes</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="lista-pedidos-tab" data-bs-toggle="tab" data-bs-target="#lista-pedidos-tab-pane" type="button" role="tab" aria-controls="lista-pedidos-tab-pane" aria-selected="false">Lista de Pedidos</button>
+        <button class="nav-link w-100 text-start text-md-center" id="lista-pedidos-tab" data-bs-toggle="tab" data-bs-target="#lista-pedidos-tab-pane" type="button" role="tab" aria-controls="lista-pedidos-tab-pane" aria-selected="false">Lista de Pedidos</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="produccion-tab" data-bs-toggle="tab" data-bs-target="#produccion-tab-pane" type="button" role="tab" aria-controls="produccion-tab-pane" aria-selected="false">Cola de Producción</button>
+        <button class="nav-link w-100 text-start text-md-center" id="produccion-tab" data-bs-toggle="tab" data-bs-target="#produccion-tab-pane" type="button" role="tab" aria-controls="produccion-tab-pane" aria-selected="false">Cola de Producción</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-tab-pane" type="button" role="tab" aria-controls="config-tab-pane" aria-selected="false"><i class="bi bi-gear-fill"></i> Configuración</button>
+        <button class="nav-link w-100 text-start text-md-center" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-tab-pane" type="button" role="tab" aria-controls="config-tab-pane" aria-selected="false"><i class="bi bi-gear-fill"></i> Configuración</button>
       </li>
     </ul>
 
@@ -497,6 +507,19 @@
 
   <!-- Tu script de Firebase y lógica del panel -->
   <script type="module" src="admin.js"></script>
+
+  <script>
+    // Auto-cerrar menú móvil al seleccionar una opción para mejorar la UX
+    document.querySelectorAll('#adminTab .nav-link').forEach(link => {
+      link.addEventListener('click', () => {
+        const menu = document.getElementById('adminTab');
+        // Si el menú está desplegado (tiene clase show) y estamos en mobile (toggler visible), lo cerramos
+        if (menu.classList.contains('show') && window.getComputedStyle(document.querySelector('.navbar-toggler')).display !== 'none') {
+          new bootstrap.Collapse(menu).hide();
+        }
+      });
+    });
+  </script>
 
 </body>
 
