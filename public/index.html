@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>InfoTech - Seguimiento de Pedidos</title>
 
+  <link rel="icon" href="logoLibro.png" type="image/png">
   <!-- Bootstrap CSS via CDN -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
@@ -15,12 +16,28 @@
 
   <style>
     body {
-      background-color: #f0f2f5;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
     }
 
     .tracking-card {
-      max-width: 500px;
+      max-width: 480px;
       width: 100%;
+      border: none;
+      border-radius: 20px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+      background-color: rgba(255, 255, 255, 0.95);
+    }
+
+    .btn-primary {
+      background: linear-gradient(45deg, #0d6efd, #0a58ca);
+      border: none;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(13, 110, 253, 0.4);
     }
   </style>
 </head>
@@ -31,9 +48,8 @@
   <main class="container flex-grow-1 d-flex flex-column justify-content-center align-items-center">
     <div class="card p-4 p-md-5 shadow-sm tracking-card">
       <div class="text-center mb-4">
-        <!-- Logo (placeholder) -->
-        <img src="assets/logo.png" alt="Logo InfoTech" class="img-fluid mb-3" style="max-height: 70px; filter: invert(0.5);"
-          onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAxMjAgNDAiPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iNDAiIGZpbGw9IiNjY2MiLz48dGV4dCB4PSI2MCIgeT0iMjUiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiPkxvZ288L3RleHQ+PC9zdmc+';">
+        <!-- Logo -->
+        <img src="logoCompleto.png" alt="Logo InfoTech" class="img-fluid mb-4" style="max-height: 80px;">
         <h1 class="h3 mb-3 fw-normal">Seguí el estado de tu pedido</h1>
       </div>
 
@@ -52,7 +68,7 @@
             <i class="bi bi-info-circle-fill"></i> Escribilo <strong>sin el 0</strong> y <strong>sin el 15</strong>. <br>Ejemplo Córdoba: <strong>351</strong>5123456
           </div>
         </div>
-        <button class="w-100 btn btn-lg btn-primary" type="submit">Buscar</button>
+        <button class="w-100 btn btn-lg btn-primary rounded-pill fw-bold" type="submit">Consultar Estado</button>
       </form>
 
       <!-- Result Container -->
@@ -63,8 +79,9 @@
   </main>
 
   <!-- Footer -->
-  <footer class="container text-center py-3">
-    <a href="https://wa.me/5493512282689" target="_blank" class="btn btn-success">
+  <footer class="container text-center py-4">
+    <p class="text-muted small mb-2">¿Necesitás ayuda?</p>
+    <a href="https://wa.me/5493512282689" target="_blank" class="btn btn-success rounded-pill px-4 shadow-sm">
       <i class="bi bi-whatsapp"></i> ¿Consultas? Chateá con nosotros
     </a>
   </footer>

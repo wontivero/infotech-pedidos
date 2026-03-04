@@ -2,7 +2,7 @@
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { generarCodigo, formatter } from "./utils.js";
-import { librosEnMemoria, clientesEnMemoria, pedidosEnMemoria } from "./data.js";
+import { librosEnMemoria, clientesEnMemoria, pedidosEnMemoria, suscribirCambios } from "./data.js";
 import { configuracionGlobal } from "./configuracion.js";
 
 let carrito = [];
@@ -32,6 +32,17 @@ export const inicializarGestorPedidos = () => {
   inputPresupuestoCodigo.value = "P";
   setupEventListeners();
   mostrarLibrosSugeridos();
+
+  // Suscribirse a cambios en libros para actualizar la vista automáticamente
+  suscribirCambios('libros', () => {
+    // Si el buscador está vacío, actualizamos los sugeridos (ahí aparecerá el nuevo libro)
+    if (inputBuscarLibro.value.trim() === '') {
+      mostrarLibrosSugeridos();
+    } else {
+      // Si el usuario estaba buscando algo, refrescamos la búsqueda
+      inputBuscarLibro.dispatchEvent(new Event('input'));
+    }
+  });
 };
 
 // --- FUNCIONES EXPORTADAS PARA OTROS MÓDULOS ---
@@ -261,7 +272,7 @@ const confirmarPedido = async () => {
       });
 
       // Generar mensaje WhatsApp para edición
-      const urlSeguimiento = window.location.origin;
+      const urlSeguimiento = 'https://infotech-pedidos.web.app';
       let msg = `Hola ${clienteSeleccionado.nombre}! 👋\n`;
       msg += `Tu pedido fue actualizado. 📝\n\n`;
       msg += `🔖 *Código de Seguimiento:* *${codigoPedidoEnEdicion}*\n`;
@@ -307,7 +318,7 @@ const confirmarPedido = async () => {
     });
 
     // Generar mensaje WhatsApp
-    const urlSeguimiento = window.location.origin;
+    const urlSeguimiento = 'https://infotech-pedidos.web.app';
     let msg = `Hola ${clienteSeleccionado.nombre}! 👋\n`;
     msg += `Tu pedido fue generado con éxito. 🚀\n\n`;
     msg += `🔖 *Código de Seguimiento:* *${codigo}*\n`;

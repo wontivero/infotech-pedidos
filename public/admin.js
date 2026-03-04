@@ -23,4 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   inicializarGestorPedidos();
   inicializarListaPedidos();
   inicializarProduccion();
+
+  // Aviso visual de entorno de desarrollo
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    const badge = document.createElement('div');
+    badge.className = 'fixed-bottom bg-warning text-dark text-center fw-bold p-1 border-top border-dark';
+    badge.style.zIndex = '9999';
+    badge.innerHTML = '<i class="bi bi-tools"></i> MODO DESARROLLO (LOCALHOST) - Datos de Prueba';
+    document.body.appendChild(badge);
+  }
 });
