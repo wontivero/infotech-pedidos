@@ -1,5 +1,5 @@
 // --- MÓDULO GESTOR DE PEDIDOS ---
-import { collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { generarCodigo, formatter } from "./utils.js";
 import { librosEnMemoria, clientesEnMemoria, pedidosEnMemoria } from "./data.js";
@@ -11,6 +11,8 @@ let clienteSeleccionado = null;
 let resultadosBusqueda = [];
 let selectedIndex = -1;
 let presupuestoOrigen = null; // Para rastrear si viene de un presupuesto
+let idPedidoEnEdicion = null; // ID del pedido que se está editando (null si es nuevo)
+let codigoPedidoEnEdicion = null; // Código visible del pedido en edición
 
 // Elementos DOM
 const inputBuscarCliente = document.getElementById('input-buscar-cliente');
@@ -23,6 +25,8 @@ const btnGenerarPedido = document.getElementById('btn-generar-pedido');
 const btnGenerarPresupuesto = document.getElementById('btn-generar-presupuesto');
 const btnCargarPresupuesto = document.getElementById('btn-cargar-presupuesto');
 const inputPresupuestoCodigo = document.getElementById('input-presupuesto-codigo');
+const modoEdicionAlert = document.getElementById('modo-edicion-alert');
+const btnCancelarEdicion = document.getElementById('btn-cancelar-edicion');
 
 export const inicializarGestorPedidos = () => {
   inputPresupuestoCodigo.value = "P";
@@ -35,6 +39,46 @@ export const seleccionarCliente = (cliente) => {
   clienteSeleccionado = cliente;
   inputBuscarCliente.value = cliente.nombre;
   listaResultadosClientes.style.display = 'none';
+};
+
+export const cargarPedidoParaEdicion = (pedido) => {
+  idPedidoEnEdicion = pedido.id;
+  codigoPedidoEnEdicion = pedido.codigo_seguimiento;
+  presupuestoOrigen = pedido.presupuesto_origen || null;
+
+  // 1. Cargar Cliente
+  const cliente = clientesEnMemoria.find(c => c.id === pedido.id_cliente);
+  if (cliente) seleccionarCliente(cliente);
+
+  // 2. Cargar Carrito (Reagrupar items planos a items con cantidad)
+  carrito = [];
+  pedido.items.forEach(item => {
+    // Buscamos si ya está en el carrito visual
+    const idx = carrito.findIndex(i => i.id === item.id); // Asumiendo que item.id es el ID del libro
+    if (idx !== -1) {
+      carrito[idx].cantidad++;
+    } else {
+      // Aseguramos tener las propiedades necesarias (si vienen del pedido guardado)
+      carrito.push({ ...item, cantidad: 1 });
+    }
+  });
+
+  // 3. Cargar Seña
+  inputSena.value = pedido.sena_pagada;
+
+  // 4. Actualizar UI
+  renderizarCarrito();
+  actualizarTotales();
+  
+  // Activar modo edición visual
+  modoEdicionAlert.classList.remove('d-none');
+  document.getElementById('lbl-edicion-codigo').textContent = pedido.codigo_seguimiento;
+  btnGenerarPedido.innerHTML = '<i class="bi bi-save"></i> Guardar Cambios';
+  btnGenerarPedido.classList.replace('btn-success', 'btn-warning');
+
+  // Cambiar a la pestaña de gestor
+  const tab = new bootstrap.Tab(document.getElementById('pedidos-tab'));
+  tab.show();
 };
 
 // --- LÓGICA INTERNA ---
@@ -77,6 +121,9 @@ const setupEventListeners = () => {
       cargarPresupuesto();
     }
   });
+
+  // Cancelar Edición
+  btnCancelarEdicion.addEventListener('click', resetearFormulario);
 
   // Atajos Teclado
   document.addEventListener('keydown', (e) => {
@@ -195,6 +242,47 @@ const confirmarPedido = async () => {
   const btn = btnGenerarPedido; const txt = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
 
+  // Lógica de Actualización (Edición)
+  if (idPedidoEnEdicion) {
+    try {
+      const itemsExpandidos = carrito.flatMap(item => {
+        const itemsIndividuales = [];
+        for (let i = 0; i < item.cantidad; i++) {
+          const { cantidad, ...itemSinCantidad } = item;
+          itemsIndividuales.push(itemSinCantidad);
+        }
+        return itemsIndividuales;
+      });
+      await updateDoc(doc(db, "pedidos", idPedidoEnEdicion), {
+        items: itemsExpandidos,
+        total: totalPedido,
+        sena_pagada: sena,
+        saldo_pendiente: totalPedido - sena
+      });
+
+      // Generar mensaje WhatsApp para edición
+      const urlSeguimiento = window.location.origin;
+      let msg = `Hola ${clienteSeleccionado.nombre}! 👋\n`;
+      msg += `Tu pedido fue actualizado. 📝\n\n`;
+      msg += `🔖 *Código de Seguimiento:* *${codigoPedidoEnEdicion}*\n`;
+      msg += `🔗 *Seguí el estado acá:* ${urlSeguimiento}\n\n`;
+      msg += `📚 *Detalle Actualizado:*\n`;
+      carrito.forEach(i => msg += `   • ${i.titulo} (x${i.cantidad})\n`);
+      msg += `\n`;
+      msg += `💰 *Total:* ${formatter.format(totalPedido)}\n`;
+      msg += `✅ *Seña:* ${formatter.format(sena)}\n`;
+      msg += `❗ *Saldo:* ${formatter.format(totalPedido - sena)}\n\n`;
+      msg += `Muchas gracias por elegirnos.`;
+      
+      navigator.clipboard.writeText(msg);
+      Swal.fire({ title: '¡Actualizado!', html: `El pedido se modificó correctamente.<br>Mensaje copiado.`, icon: 'success' });
+      resetearFormulario();
+    } catch (e) { console.error(e); Swal.fire('Error', 'No se pudo actualizar.', 'error'); }
+    finally { btn.disabled = false; btn.innerHTML = txt; }
+    return;
+  }
+
+  // Lógica de Creación (Nuevo)
   try {
     const codigo = generarCodigo();
     const itemsExpandidos = carrito.flatMap(item => {
@@ -234,10 +322,20 @@ const confirmarPedido = async () => {
     Swal.fire({ title: '¡Pedido Creado!', html: `Código: <strong>${codigo}</strong><br>Mensaje copiado.`, icon: 'success' });
     
     // Reset
-    carrito = []; totalPedido = 0; inputSena.value = ""; clienteSeleccionado = null; inputBuscarCliente.value = "";
-    presupuestoOrigen = null; renderizarCarrito(); actualizarTotales(); inputPresupuestoCodigo.value = "P";
+    resetearFormulario();
   } catch (e) { console.error(e); Swal.fire('Error', 'Falló al crear pedido.', 'error'); }
   finally { btn.disabled = false; btn.innerHTML = txt; }
+};
+
+const resetearFormulario = () => {
+  carrito = []; totalPedido = 0; inputSena.value = ""; clienteSeleccionado = null; inputBuscarCliente.value = "";
+  presupuestoOrigen = null; idPedidoEnEdicion = null; codigoPedidoEnEdicion = null;
+  renderizarCarrito(); actualizarTotales(); inputPresupuestoCodigo.value = "P";
+  
+  // Restaurar UI
+  modoEdicionAlert.classList.add('d-none');
+  btnGenerarPedido.innerHTML = '<i class="bi bi-check-lg"></i> Confirmar Pedido <span class="badge bg-dark ms-2" style="font-size: 0.7em;">F1</span>';
+  btnGenerarPedido.classList.replace('btn-warning', 'btn-success');
 };
 
 const generarPresupuesto = async () => {
@@ -297,10 +395,7 @@ const generarPresupuesto = async () => {
 
     // Si elige "Crear Otro", limpiamos todo
     if (result.dismiss === Swal.DismissReason.cancel) {
-      carrito = []; totalPedido = 0; inputSena.value = ""; clienteSeleccionado = null; inputBuscarCliente.value = "";
-      presupuestoOrigen = null;
-      renderizarCarrito(); actualizarTotales();
-      inputPresupuestoCodigo.value = "P";
+      resetearFormulario();
     }
   } finally { btn.disabled = false; btn.innerHTML = txt; }
 };

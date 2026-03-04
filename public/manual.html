@@ -36,8 +36,9 @@
             <h3><i class="bi bi-globe text-success"></i> Vista Pública (Rastreo)</h3>
             <p>Accesible desde la página principal (<code>index.html</code>).</p>
             <ul>
-                <li><strong>Funcionalidad:</strong> Permite a los clientes ingresar su <strong>Código de Seguimiento</strong> (ej: <code>12345</code>) para ver el estado actual de su pedido y el saldo pendiente.</li>
-                <li><strong>Estados posibles:</strong> En cola de impresión, Imprimiendo / Armando, Listo para retirar, Entregado.</li>
+                <li><strong>Seguridad:</strong> Para ver el estado, el cliente debe ingresar su <strong>Código de Seguimiento</strong> y su <strong>Número de Teléfono</strong> (validación de identidad).</li>
+                <li><strong>Detalle Completo:</strong> Muestra el listado de libros encargados, el estado actual, el total, la seña abonada y el saldo pendiente.</li>
+                <li><strong>Claridad:</strong> Diseñado para ser fácil de usar, con instrucciones claras sobre cómo ingresar el teléfono (sin 0 ni 15).</li>
             </ul>
         </div>
 
@@ -100,6 +101,7 @@
             <h4>3. Lista de Pedidos</h4>
             <ul>
                 <li><strong>Visión General:</strong> Tabla con todos los pedidos históricos ordenados por fecha y hora.</li>
+                <li><strong>Referencia:</strong> Nueva columna que indica si el pedido se generó desde un presupuesto (ej: <code>P12345</code>).</li>
                 <li><strong>Buscador:</strong> Podés filtrar por Cliente, <strong>Teléfono</strong> o Código.</li>
                 <li><strong>Estados y Colores:</strong>
                     <ul>
@@ -114,6 +116,7 @@
                 <li><strong>Acciones:</strong>
                     <ul>
                         <li><i class="bi bi-eye"></i> <strong>Ver Detalle:</strong> Muestra qué libros pidió el cliente y los montos.</li>
+                        <li><i class="bi bi-pencil"></i> <strong>Editar Pedido:</strong> Permite modificar ítems, cantidades o seña de un pedido activo. Al guardar, se genera un nuevo mensaje de WhatsApp con la actualización.</li>
                         <li><i class="bi bi-whatsapp"></i> <strong>Avisar Cliente:</strong> Si el pedido está listo, aparece un botón verde para copiar el mensaje de aviso a WhatsApp.</li>
                         <li><strong>Cambio de Estado:</strong> Se puede cambiar el estado general del pedido desde el botón desplegable.</li>
                     </ul>

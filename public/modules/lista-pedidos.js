@@ -3,7 +3,7 @@ import { collection, getDocs, query, orderBy, doc, updateDoc } from "https://www
 import { db } from "./firebase.js";
 import { formatter } from "./utils.js";
 import { clientesEnMemoria, pedidosEnMemoria, suscribirCambios } from "./data.js";
-import { mostrarLibrosSugeridos } from "./gestor-pedidos.js";
+import { mostrarLibrosSugeridos, cargarPedidoParaEdicion } from "./gestor-pedidos.js";
 
 const container = document.getElementById('tabla-pedidos-container');
 const btnRefrescar = document.getElementById('btn-refrescar-pedidos');
@@ -72,6 +72,7 @@ const filtrarYRenderizar = () => {
       <td>${formatter.format(p.saldo_pendiente)}</td>
       <td>
         <button class="btn btn-sm btn-outline-primary btn-detalle" data-id="${p.id}"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-sm btn-outline-warning btn-editar-pedido" data-id="${p.id}" title="Editar Pedido"><i class="bi bi-pencil"></i></button>
         <div class="btn-group">
           <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Estado</button>
           <ul class="dropdown-menu">
@@ -137,6 +138,12 @@ const setupEventListeners = () => {
       document.getElementById('detalle-pedido-lista-items').innerHTML = p.items.map(i => `<li class="list-group-item d-flex justify-content-between"><div><strong>${i.titulo}</strong><br><small>${i.editorial||''}</small></div><span>${formatter.format(i.precio)}</span></li>`).join('');
       document.getElementById('detalle-pedido-totales').innerHTML = `Total: ${formatter.format(p.total)}<br>Seña: ${formatter.format(p.sena_pagada)}<br><span class="text-danger">Saldo: ${formatter.format(p.saldo_pendiente)}</span>`;
       new bootstrap.Modal(document.getElementById('modalDetallePedido')).show();
+    }
+    // Editar Pedido
+    if (e.target.closest('.btn-editar-pedido')) {
+      const id = e.target.closest('.btn-editar-pedido').dataset.id;
+      const pedido = pedidosEnMemoria.find(p => p.id === id);
+      if (pedido) cargarPedidoParaEdicion(pedido);
     }
     // Cambio Estado
     if (e.target.closest('.btn-est')) {
