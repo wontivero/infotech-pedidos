@@ -22,9 +22,11 @@ const renderizarTablaLibros = () => {
   let tableHTML = `<table class="table table-striped table-hover align-middle">
       <thead><tr><th>Portada</th><th>Título</th><th>Páginas</th><th>Editorial</th><th>Precio</th><th>Acciones</th></tr></thead>
       <tbody>`;
+  const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='75' viewBox='0 0 50 75'%3E%3Crect width='50' height='75' fill='%23e9ecef'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%236c757d'%3ESin Img%3C/text%3E%3C/svg%3E";
   librosEnMemoria.forEach((libro) => {
+      const imgUrl = libro.imageUrl || placeholder;
       tableHTML += `<tr>
-        <td><img src="${libro.imageUrl || 'https://via.placeholder.com/50x75'}" width="50" class="img-thumbnail" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalImagen" data-img-url="${libro.imageUrl || 'https://via.placeholder.com/50x75'}"></td>
+        <td><img src="${imgUrl}" width="50" class="img-thumbnail" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalImagen" data-img-url="${imgUrl}" onerror="this.src='${placeholder}'"></td>
         <td>${libro.titulo || 'Sin Título'}</td>
         <td>${libro.paginas || 'N/A'}</td>
         <td>${libro.editorial || 'N/A'}</td>
@@ -90,6 +92,7 @@ const setupEventListeners = () => {
         document.getElementById('edit-libro-paginas').value = libro.paginas;
         document.getElementById('edit-libro-editorial').value = libro.editorial;
         document.getElementById('edit-libro-precio').value = libro.precio;
+        document.getElementById('edit-libro-imagen').value = ''; // Limpiar input file
         new bootstrap.Modal(document.getElementById('modalEditarLibro')).show();
       }
     }
@@ -97,12 +100,32 @@ const setupEventListeners = () => {
 
   // Guardar Edición
   document.getElementById('btn-guardar-edicion-libro').addEventListener('click', async () => {
-    const id = document.getElementById('edit-libro-id').value;
-    const editorial = capitalizarTexto(document.getElementById('edit-libro-editorial').value);
-    const datos = { titulo: capitalizarTexto(document.getElementById('edit-libro-titulo').value), paginas: Number(document.getElementById('edit-libro-paginas').value), editorial: editorial, precio: parseFloat(document.getElementById('edit-libro-precio').value) };
-    await guardarReferenciaSiNoExiste("editoriales", editorialesEnMemoria, editorial);
-    await updateDoc(doc(db, "libros", id), datos);
-    Swal.fire('Actualizado', 'Datos guardados.', 'success');
-    bootstrap.Modal.getInstance(document.getElementById('modalEditarLibro')).hide();
+    const btn = document.getElementById('btn-guardar-edicion-libro');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+
+    try {
+      const id = document.getElementById('edit-libro-id').value;
+      const editorial = capitalizarTexto(document.getElementById('edit-libro-editorial').value);
+      const datos = { titulo: capitalizarTexto(document.getElementById('edit-libro-titulo').value), paginas: Number(document.getElementById('edit-libro-paginas').value), editorial: editorial, precio: parseFloat(document.getElementById('edit-libro-precio').value) };
+      
+      const imagenFile = document.getElementById('edit-libro-imagen').files[0];
+      if (imagenFile) {
+        const imageUrl = await subirImagen(imagenFile);
+        datos.imageUrl = imageUrl;
+      }
+
+      await guardarReferenciaSiNoExiste("editoriales", editorialesEnMemoria, editorial);
+      await updateDoc(doc(db, "libros", id), datos);
+      Swal.fire('Actualizado', 'Datos guardados.', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('modalEditarLibro')).hide();
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Error', 'No se pudo actualizar.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
   });
 };

@@ -38,7 +38,8 @@
             <p>Accesible desde la página principal (<code>index.html</code>).</p>
             <ul>
                 <li><strong>Seguridad:</strong> Para ver el estado, el cliente debe ingresar su <strong>Código de Seguimiento</strong> y su <strong>Número de Teléfono</strong> (validación de identidad).</li>
-                <li><strong>Detalle Completo:</strong> Muestra el listado de libros encargados, el estado actual, el total, la seña abonada y el saldo pendiente.</li>
+                <li><strong>Enlace Directo (Nuevo):</strong> El sistema genera un link seguro (ej: <code>?id=...</code>) que permite al cliente ver su pedido directamente sin ingresar datos.</li>
+                <li><strong>Detalle Completo:</strong> Muestra el listado de libros encargados (con fotos), el estado actual, el total, la seña abonada y el saldo pendiente.</li>
                 <li><strong>Claridad:</strong> Diseñado para ser fácil de usar, con instrucciones claras sobre cómo ingresar el teléfono (sin 0 ni 15).</li>
             </ul>
         </div>
@@ -118,7 +119,7 @@
                     <ul>
                         <li><i class="bi bi-eye"></i> <strong>Ver Detalle:</strong> Muestra qué libros pidió el cliente y los montos.</li>
                         <li><i class="bi bi-pencil"></i> <strong>Editar Pedido:</strong> Permite modificar ítems, cantidades o seña de un pedido activo. Al guardar, se genera un nuevo mensaje de WhatsApp con la actualización.</li>
-                        <li><i class="bi bi-whatsapp"></i> <strong>Avisar Cliente:</strong> Si el pedido está listo, aparece un botón verde para copiar el mensaje de aviso a WhatsApp.</li>
+                        <li><i class="bi bi-whatsapp"></i> <strong>Avisar Cliente:</strong> Genera un mensaje de WhatsApp con un <strong>Link Directo</strong> para que el cliente vea su pedido con un solo clic.</li>
                         <li><strong>Cambio de Estado:</strong> Se puede cambiar el estado general del pedido desde el botón desplegable.</li>
                     </ul>
                 </li>

@@ -14,6 +14,18 @@ export const capitalizarTexto = (texto) => {
 };
 
 /**
+ * Limpia el número de teléfono eliminando caracteres no numéricos y el prefijo +549.
+ * Ej: "+54 9 351 123456" -> "351123456"
+ */
+export const limpiarTelefono = (telefono) => {
+  if (!telefono) return '';
+  let limpio = telefono.toString().replace(/[^0-9]/g, '');
+  if (limpio.startsWith('549')) limpio = limpio.substring(3);
+  else if (limpio.startsWith('54')) limpio = limpio.substring(2);
+  return limpio;
+};
+
+/**
  * Genera un código aleatorio numérico de 5 dígitos con un prefijo opcional.
  * Ej: generarCodigo('P') -> "P12345"
  */

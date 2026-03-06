@@ -151,14 +151,17 @@ const renderizarResultadosBusqueda = (libros, titulo = '') => {
   
   if (libros.length === 0) { listaResultados.innerHTML += '<div class="col-12 text-center text-muted py-4">No se encontraron libros.</div>'; return; }
 
+  const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='75' viewBox='0 0 50 75'%3E%3Crect width='50' height='75' fill='%23e9ecef'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%236c757d'%3ESin Img%3C/text%3E%3C/svg%3E";
+
   libros.slice(0, 10).forEach((libro) => {
     const col = document.createElement('div'); col.className = 'col-md-6';
+    const imgUrl = libro.imageUrl || placeholder;
     col.innerHTML = `
       <div class="card h-100 search-card-book border-light" style="transition: transform 0.1s;">
         <div class="card-body p-2 d-flex flex-column h-100">
           <h6 class="card-title mb-2 text-center text-dark fw-bold" style="font-size: 0.95rem;">${libro.titulo}</h6>
           <div class="d-flex align-items-center justify-content-center mt-auto">
-            <img src="${libro.imageUrl || 'https://via.placeholder.com/50x75'}" class="rounded me-3 shadow-sm" style="height: 80px; width: 55px; object-fit: cover; cursor: zoom-in;" data-bs-toggle="modal" data-bs-target="#modalImagen" data-img-url="${libro.imageUrl}">
+            <img src="${imgUrl}" class="rounded me-3 shadow-sm" style="height: 80px; width: 55px; object-fit: cover; cursor: zoom-in;" data-bs-toggle="modal" data-bs-target="#modalImagen" data-img-url="${imgUrl}" onerror="this.src='${placeholder}'">
             <div class="text-start">
               <p class="card-text mb-1 lh-1"><small class="text-muted">${libro.editorial || '-'}<br>${libro.paginas || '?'} pág.</small></p>
               <p class="card-text text-primary fw-bold fs-5 mb-0">${formatter.format(libro.precio)}</p>
@@ -214,10 +217,12 @@ const agregarAlCarrito = (libro) => {
 
 const renderizarCarrito = () => {
   tablaCarrito.innerHTML = '';
+  const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='75' viewBox='0 0 50 75'%3E%3Crect width='50' height='75' fill='%23e9ecef'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%236c757d'%3ESin Img%3C/text%3E%3C/svg%3E";
   carrito.forEach((item, index) => {
+    const imgUrl = item.imageUrl || placeholder;
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td><img src="${item.imageUrl || 'https://via.placeholder.com/50x75'}" width="30" height="45" class="rounded" style="object-fit: cover;"></td>
+      <td><img src="${imgUrl}" width="30" height="45" class="rounded" style="object-fit: cover;" onerror="this.src='${placeholder}'"></td>
       <td><div class="text-truncate" style="max-width: 150px;" title="${item.titulo}">${item.titulo}</div></td>
       <td class="text-center">
         <div class="input-group input-group-sm" style="width: 80px; margin: 0 auto;">
@@ -276,11 +281,13 @@ const confirmarPedido = async () => {
       });
 
       // Generar mensaje WhatsApp para edición
-      const urlSeguimiento = 'https://infotech-pedidos.web.app';
+      const basePath = window.location.pathname.includes('/public/') ? '/public/index.html' : '';
+      const urlSeguimiento = `${window.location.origin}${basePath}`;
+      const linkDirecto = `${urlSeguimiento}?id=${idPedidoEnEdicion}`;
       let msg = `Hola ${clienteSeleccionado.nombre}! 👋\n`;
       msg += `Tu pedido fue actualizado. 📝\n\n`;
       msg += `🔖 *Código de Seguimiento:* *${codigoPedidoEnEdicion}*\n`;
-      msg += `🔗 *Seguí el estado acá:* ${urlSeguimiento}\n\n`;
+      msg += `🔗 *Seguí el estado acá:* ${linkDirecto}\n\n`;
       msg += `📚 *Detalle Actualizado:*\n`;
       carrito.forEach(i => msg += `   • ${i.titulo} (x${i.cantidad})\n`);
       msg += `\n`;
@@ -309,7 +316,7 @@ const confirmarPedido = async () => {
       return itemsIndividuales;
     });
     
-    await addDoc(collection(db, "pedidos"), {
+    const docRef = await addDoc(collection(db, "pedidos"), {
       codigo_seguimiento: codigo,
       id_cliente: clienteSeleccionado.id,
       presupuesto_origen: presupuestoOrigen, // Guardamos la referencia
@@ -322,11 +329,13 @@ const confirmarPedido = async () => {
     });
 
     // Generar mensaje WhatsApp
-    const urlSeguimiento = 'https://infotech-pedidos.web.app';
+    const basePath = window.location.pathname.includes('/public/') ? '/public/index.html' : '';
+    const urlSeguimiento = `${window.location.origin}${basePath}`;
+    const linkDirecto = `${urlSeguimiento}?id=${docRef.id}`;
     let msg = `Hola ${clienteSeleccionado.nombre}! 👋\n`;
     msg += `Tu pedido fue generado con éxito. 🚀\n\n`;
     msg += `🔖 *Código de Seguimiento:* *${codigo}*\n`;
-    msg += `🔗 *Seguí el estado acá:* ${urlSeguimiento}\n\n`;
+    msg += `🔗 *Seguí el estado acá:* ${linkDirecto}\n\n`;
     msg += `💰 *Total:* ${formatter.format(totalPedido)}\n`;
     msg += `✅ *Seña:* ${formatter.format(sena)}\n`;
     msg += `❗ *Saldo:* ${formatter.format(totalPedido - sena)}\n\n`;
@@ -459,8 +468,11 @@ const verDetalleLibro = (libro) => {
     return `<div class="mb-2"><div class="d-flex justify-content-between small"><span>${lbl}</span><span>${val} (${pct}%)</span></div><div class="progress" style="height: 8px;"><div class="progress-bar bg-${col}" style="width: ${pct}%"></div></div></div>`;
   };
 
+  const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='75' viewBox='0 0 50 75'%3E%3Crect width='50' height='75' fill='%23e9ecef'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%236c757d'%3ESin Img%3C/text%3E%3C/svg%3E";
+  const imgUrl = libro.imageUrl || placeholder;
+
   content.innerHTML = `
-    <div class="text-center mb-3"><img src="${libro.imageUrl || 'https://via.placeholder.com/150'}" class="img-thumbnail" style="max-height: 200px;"></div>
+    <div class="text-center mb-3"><img src="${imgUrl}" class="img-thumbnail shadow-sm" style="max-height: 200px;" onerror="this.src='${placeholder}'"></div>
     <ul class="list-group list-group-flush mb-3">
       <li class="list-group-item d-flex justify-content-between"><span>Precio:</span> <strong>${formatter.format(libro.precio)}</strong></li>
       <li class="list-group-item d-flex justify-content-between"><span>Editorial:</span> <span>${libro.editorial || '-'}</span></li>

@@ -155,10 +155,13 @@ const setupEventListeners = () => {
       const p = pedidosEnMemoria.find(x => x.id === e.target.closest('.btn-wa').dataset.id);
       const c = clientesEnMemoria.find(x => x.id === p.id_cliente);
       const nombreCliente = c ? c.nombre : 'Cliente';
+      const basePath = window.location.pathname.includes('/public/') ? '/public/index.html' : '';
+      const linkDirecto = `${window.location.origin}${basePath}?id=${p.id}`;
  
       let msg = `Hola ${nombreCliente}! 👋\n`;
       msg += `¡Buenas noticias! Tu pedido ya está completo y listo para retirar. 📚✨\n\n`;
       msg += `🔢 *Para retirar, por favor indicanos el número de pedido:* *${p.codigo_seguimiento}*\n\n`;
+      msg += `🔗 *Ver estado:* ${linkDirecto}\n\n`;
       
       if (p.saldo_pendiente > 0) {
         msg += `❗ *Saldo pendiente:* ${formatter.format(p.saldo_pendiente)}\n`;

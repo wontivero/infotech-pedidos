@@ -1,7 +1,7 @@
 // --- MÓDULO ABM CLIENTES ---
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase.js";
-import { capitalizarTexto } from "./utils.js";
+import { capitalizarTexto, limpiarTelefono } from "./utils.js";
 import { suscribirCambios, guardarReferenciaSiNoExiste, colegiosEnMemoria, clientesEnMemoria } from "./data.js";
 import { seleccionarCliente } from "./gestor-pedidos.js"; // Importamos para el cliente rápido
 
@@ -12,6 +12,7 @@ const formNuevoClienteRapido = document.getElementById('form-nuevo-cliente-rapid
 export const inicializarClientes = () => {
   renderizarTablaClientes();
   suscribirCambios('clientes', renderizarTablaClientes);
+
   setupEventListeners();
 };
 
@@ -30,7 +31,7 @@ const setupEventListeners = () => {
     e.preventDefault();
     await guardarCliente(
       document.getElementById('cliente-nombre').value,
-      document.getElementById('cliente-telefono').value,
+      limpiarTelefono(document.getElementById('cliente-telefono').value),
       document.getElementById('cliente-colegio').value,
       formNuevoCliente
     );
@@ -40,7 +41,7 @@ const setupEventListeners = () => {
   formNuevoClienteRapido.addEventListener('submit', async (e) => {
     e.preventDefault();
     const nombre = document.getElementById('rapido-cliente-nombre').value;
-    const telefono = document.getElementById('rapido-cliente-telefono').value;
+    const telefono = limpiarTelefono(document.getElementById('rapido-cliente-telefono').value);
     const colegio = document.getElementById('rapido-cliente-colegio').value;
     const docRef = await guardarCliente(nombre, telefono, colegio, formNuevoClienteRapido);
     
@@ -73,7 +74,7 @@ const setupEventListeners = () => {
   document.getElementById('btn-guardar-edicion-cliente').addEventListener('click', async () => {
     const id = document.getElementById('edit-cliente-id').value;
     const colegio = capitalizarTexto(document.getElementById('edit-cliente-colegio').value);
-    const datos = { nombre: capitalizarTexto(document.getElementById('edit-cliente-nombre').value), telefono: document.getElementById('edit-cliente-telefono').value, colegio: colegio };
+    const datos = { nombre: capitalizarTexto(document.getElementById('edit-cliente-nombre').value), telefono: limpiarTelefono(document.getElementById('edit-cliente-telefono').value), colegio: colegio };
     await guardarReferenciaSiNoExiste("colegios", colegiosEnMemoria, colegio);
     await updateDoc(doc(db, "clientes", id), datos);
     Swal.fire('Actualizado', '', 'success');

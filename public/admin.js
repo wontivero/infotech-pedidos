@@ -8,6 +8,7 @@ import { inicializarGestorPedidos } from "./modules/gestor-pedidos.js";
 import { inicializarListaPedidos } from "./modules/lista-pedidos.js";
 import { inicializarProduccion } from "./modules/produccion.js";
 import { inicializarConfiguracion } from "./modules/configuracion.js";
+import { inicializarGruposCompra } from "./modules/grupos-compra.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Iniciar escuchas en tiempo real (Data Layer)
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   inicializarGestorPedidos();
   inicializarListaPedidos();
   inicializarProduccion();
+  inicializarGruposCompra();
 
   // Aviso visual de entorno de desarrollo
   if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
@@ -31,5 +33,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     badge.style.zIndex = '9999';
     badge.innerHTML = '<i class="bi bi-tools"></i> MODO DESARROLLO (LOCALHOST) - Datos de Prueba';
     document.body.appendChild(badge);
+  }
+
+  // Configuración global del modal de imágenes (para Libros y Comprobantes)
+  const modalImagenElement = document.getElementById('modalImagen');
+  if (modalImagenElement) {
+    modalImagenElement.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      const url = button.getAttribute('data-img-url');
+      document.getElementById('imagen-ampliada').src = url;
+    });
   }
 });

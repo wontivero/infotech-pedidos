@@ -104,6 +104,9 @@
         <button class="nav-link w-100 text-start text-md-center" id="produccion-tab" data-bs-toggle="tab" data-bs-target="#produccion-tab-pane" type="button" role="tab" aria-controls="produccion-tab-pane" aria-selected="false">Cola de Producción</button>
       </li>
       <li class="nav-item" role="presentation">
+        <button class="nav-link w-100 text-start text-md-center" id="grupos-tab" data-bs-toggle="tab" data-bs-target="#grupos-tab-pane" type="button" role="tab" aria-controls="grupos-tab-pane" aria-selected="false"><i class="bi bi-people-fill"></i> Grupos de Compra</button>
+      </li>
+      <li class="nav-item" role="presentation">
         <button class="nav-link w-100 text-start text-md-center" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-tab-pane" type="button" role="tab" aria-controls="config-tab-pane" aria-selected="false"><i class="bi bi-gear-fill"></i> Configuración</button>
       </li>
     </ul>
@@ -382,6 +385,34 @@
         </div>
       </div>
 
+      <!-- Pestaña 7: Grupos de Compra -->
+      <div class="tab-pane fade" id="grupos-tab-pane" role="tabpanel" aria-labelledby="grupos-tab" tabindex="0">
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div class="card">
+              <div class="card-header">Crear Nuevo Grupo</div>
+              <div class="card-body">
+                <form id="form-nuevo-grupo">
+                  <div class="mb-3 position-relative">
+                    <label class="form-label">Libro</label>
+                    <input type="text" class="form-control" id="grupo-input-libro" placeholder="Buscar libro..." autocomplete="off" required>
+                    <input type="hidden" id="grupo-libro-id">
+                    <div id="grupo-lista-libros" class="list-group position-absolute w-100 shadow" style="z-index: 1050; max-height: 200px; overflow-y: auto; display: none;"></div>
+                  </div>
+                  <div class="mb-3"><label class="form-label">Precio Final</label><input type="number" class="form-control" id="grupo-precio" required placeholder="Precio por unidad"></div>
+                  <div class="mb-3"><label class="form-label">Colegio</label><input type="text" class="form-control" id="grupo-colegio" list="datalist-colegios" autocomplete="off" required></div>
+                  <div class="mb-3"><label class="form-label">Curso</label><input type="text" class="form-control" id="grupo-curso" placeholder="Ej: 3er Grado B"></div>
+                  <div class="d-grid"><button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Crear Grupo y Generar Link</button></div>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-8">
+            <div id="lista-grupos-container"></div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </main>
 
@@ -412,6 +443,7 @@
             <div class="mb-3"><label class="form-label">Páginas</label><input type="number" class="form-control" id="edit-libro-paginas"></div>
             <div class="mb-3"><label class="form-label">Editorial</label><input type="text" class="form-control" id="edit-libro-editorial" list="datalist-editoriales" autocomplete="off"></div>
             <div class="mb-3"><label class="form-label">Precio</label><input type="number" class="form-control" id="edit-libro-precio" step="0.01"></div>
+            <div class="mb-3"><label class="form-label">Cambiar Imagen (Opcional)</label><input type="file" class="form-control" id="edit-libro-imagen" accept="image/*"></div>
           </form>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary" id="btn-guardar-edicion-libro">Guardar Cambios</button></div>
